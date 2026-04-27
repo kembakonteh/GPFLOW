@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GPFLOW — Offline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: linear-gradient(160deg, #060B14, #0A1220, #060B14);
+      min-height: 100vh;
+      color: #EEF2FF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #0D1525;
+      border: 1px solid #182236;
+      border-radius: 24px;
+      padding: 40px 32px;
+      text-align: center;
+      max-width: 360px;
+      width: 100%;
+    }
+    .logo {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #00D4A0, #00A87A);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      font-weight: 900;
+      color: #07090F;
+      margin: 0 auto 20px;
+    }
+    .emoji { font-size: 48px; margin-bottom: 16px; }
+    h1 { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+    p  { font-size: 14px; color: #8896AA; line-height: 1.6; margin-bottom: 24px; }
+    button {
+      background: linear-gradient(135deg, #00D4A0, #00A87A);
+      border: none;
+      border-radius: 12px;
+      padding: 13px 28px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 800;
+      color: #07090F;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">G</div>
+    <div class="emoji">📶</div>
+    <h1>You're offline</h1>
+    <p>Check your internet connection and try again. Your last-viewed pages may still be available.</p>
+    <button onclick="window.location.reload()">Try again →</button>
+  </div>
+</body>
+</html>

@@ -1,0 +1,28 @@
+﻿# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Environment
+backend/.env
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Vite cache
+.vite/
+
+# Docker volumes
+postgres_data/
+redis_data/
+
+# Claude Code
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db

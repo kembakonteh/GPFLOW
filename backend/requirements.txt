@@ -1,0 +1,17 @@
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+pydantic[email]==2.10.3
+pydantic-settings==2.7.0
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.1
+arq==0.26.1
+boto3==1.35.90          # for Cloudflare R2 (S3-compatible)
+httpx==0.28.1           # async HTTP for WhatsApp / webhooks
+stripe==11.4.0
+python-multipart==0.0.20
+reportlab==4.2.5           # PDF generation for QR labels
+qrcode[pil]==8.0           # QR code image generation
+Pillow==11.1.0             # image processing (required by qrcode[pil])
