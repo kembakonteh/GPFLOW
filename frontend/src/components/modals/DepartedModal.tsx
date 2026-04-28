@@ -24,9 +24,10 @@ export default function DepartedModal({ trip, bookings, onClose, onDeparted }: P
   const op     = trip.operator_business_name;
 
   function buildMsg(b: Booking): string {
-    const fn  = b.sender_name.split(" ")[0];
-    const lbs = b.confirmed_weight_kg != null ? (b.confirmed_weight_kg * 2.20462).toFixed(1) : "?";
-    const kg  = b.confirmed_weight_kg?.toFixed(2) ?? "?";
+    const fn    = b.sender_name.split(" ")[0];
+    const confKg = b.confirmed_weight_kg != null ? Number(b.confirmed_weight_kg) : null;
+    const lbs   = confKg != null ? (confKg * 2.20462).toFixed(1) : "?";
+    const kg    = confKg != null ? confKg.toFixed(2) : "?";
     return (
       `Hi ${fn} 👋\n\nWe've left ${origin}! ✈️\n` +
       `Your package is on its way to ${dest}.\n\n` +

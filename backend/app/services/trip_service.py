@@ -231,12 +231,9 @@ async def process_arrival(
     if trip.status not in (TripStatus.in_transit, TripStatus.open, TripStatus.closed):
         raise validation_error("Trip must be in transit, open, or closed to mark as arrived")
 
-    # Format a human-readable window: "May 01, 2026 • 10:00am - 4:00pm"
-    window = f"{data.pickup_date.strftime('%B %d, %Y')} • {data.pickup_time}"
-
     trip.status          = TripStatus.arrived
     trip.pickup_location = data.pickup_location
-    trip.pickup_window   = window
+    trip.pickup_window   = data.pickup_window
     trip.pickup_notes    = data.pickup_notes or ""
     trip.arrived_at      = datetime.now(UTC)
 

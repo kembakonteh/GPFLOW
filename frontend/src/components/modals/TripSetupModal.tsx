@@ -53,7 +53,7 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
     setLoading(true);
     setError("");
     try {
-      const ratePerKg = rateLbNum * 2.20462; // convert lb rate → kg rate
+      const ratePerKg = rateLbNum; // backend converts lb→kg based on operator.weight_unit
       const originCity = origin.split(",")[0].trim();
       const destCity   = dest.split(",")[0].trim();
       // Always use 2-char ISO codes based on direction

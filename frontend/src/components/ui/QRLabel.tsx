@@ -9,7 +9,7 @@ interface Props {
 export default function QRLabel({ booking, trip }: Props) {
   const origin = `${trip.origin_city}, ${trip.origin_country}`;
   const dest   = `${trip.destination_city}, ${trip.destination_country}`;
-  const confKg = booking.confirmed_weight_kg;
+  const confKg = booking.confirmed_weight_kg != null ? Number(booking.confirmed_weight_kg) : null;
   const confLbs = confKg != null ? (confKg * 2.20462).toFixed(1) : null;
   const weightLabel = confLbs != null ? `${confLbs}lbs (${confKg!.toFixed(2)}kg)` : null;
   const costLabel = booking.confirmed_cost_display ?? null;

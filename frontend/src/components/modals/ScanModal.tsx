@@ -140,7 +140,12 @@ export default function ScanModal({ trip, bookings, onClose, onDelivered }: Prop
     if (!selected || loading) return;
     setLoading(true);
     try {
-      const { data } = await api.post<Booking>(`/bookings/${selected.id}/scan`, { action: act });
+      // Record scan checkpoint if a real QR was scanned
+      if (scanDone && !camDenied) {
+        await api.post(`/bookings/${selected.id}/scan`, {}).catch(() => {});
+      }
+      // Update booking status to collected or delivered
+      const { data } = await api.patch<Booking>(`/bookings/${selected.id}/status`, { status: act });
       setAction(act);
       setUpdatedBooking(data);
       onDelivered(data);

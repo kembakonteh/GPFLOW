@@ -10,7 +10,7 @@ import TrackingPage         from './pages/TrackingPage';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         {/* ── Operator auth ───────────────────────────────────────────────── */}
         <Route path="/login"    element={<LoginPage />} />

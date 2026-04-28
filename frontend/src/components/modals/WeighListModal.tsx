@@ -11,12 +11,13 @@ interface Props {
   bookings: Booking[];
   onClose: () => void;
   onBookingUpdate: (b: Booking) => void;
+  initialView?: "list" | "walkin";
 }
 
 type View = "list" | "walkin";
 
-export default function WeighListModal({ trip, bookings, onClose, onBookingUpdate }: Props) {
-  const [view, setView] = useState<View>("list");
+export default function WeighListModal({ trip, bookings, onClose, onBookingUpdate, initialView = "list" }: Props) {
+  const [view, setView] = useState<View>(initialView);
   const [search, setSearch] = useState("");
   const [weighing, setWeighing] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,7 +46,8 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
     if (!waSender || !waPhone || !waRecipient || !waCity || !waItems || loading) return;
     setLoading(true);
     try {
-      const { data } = await api.post<Booking>("/bookings", {
+      // Step 1: create booking via public endpoint
+      const { data: created } = await api.post<{ id: string }>("/bookings", {
         trip_id: trip.id,
         sender_name: waSender,
         sender_phone: waPhone,
@@ -54,10 +56,11 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
         item_description: waItems,
         quantity: 1,
         estimated_weight_kg: 0,
-        is_walk_in: true,
       });
-      onBookingUpdate(data);
-      setWeighing(data);
+      // Step 2: fetch the full operator booking (all fields WeighModal needs)
+      const { data: full } = await api.get<Booking>(`/bookings/${created.id}`);
+      onBookingUpdate(full);
+      setWeighing(full);
       setView("list");
     } finally {
       setLoading(false);
@@ -140,7 +143,18 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
 
             {/* Pending list */}
             <div style={{ maxHeight: "40vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-              {filtered.length === 0 && (
+              {filtered.length === 0 && pending.length === 0 && weighed.length > 0 && (
+                <div style={{
+                  textAlign: "center", padding: "24px 0",
+                  background: C.accentDim, border: `1px solid ${C.accentBorder}`,
+                  borderRadius: 14,
+                }}>
+                  <div style={{ fontSize: 24, marginBottom: 8 }}>✅</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: C.accent, marginBottom: 4 }}>All packages weighed!</div>
+                  <div style={{ fontSize: 12, color: C.textSub }}>You can close this and mark the trip as departed.</div>
+                </div>
+              )}
+              {filtered.length === 0 && search && (
                 <div style={{ textAlign: "center", padding: "24px 0", color: C.textSub }}>
                   <div style={{ fontSize: 14, marginBottom: 8 }}>No results for "{search}"</div>
                   <div style={{ fontSize: 12, color: C.textDim, marginBottom: 12 }}>
@@ -219,7 +233,7 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {weighed.map((b) => {
-                    const lbs = (b.confirmed_weight_kg! * 2.20462).toFixed(1);
+                    const lbs = (Number(b.confirmed_weight_kg) * 2.20462).toFixed(1);
                     return (
                       <div
                         key={b.id}

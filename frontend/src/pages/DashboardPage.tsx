@@ -27,6 +27,7 @@ type UIStage =
 type ModalKey =
   | "tripSetup"
   | "weighList"
+  | "walkIn"
   | "departed"
   | "cutoff"
   | "arrived"
@@ -253,7 +254,22 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
-              <BigBtn label="⚖️ Start Weighing Packages" color={`linear-gradient(135deg,${C.gold},#D97706)`} onClick={() => setModal("weighList")} disabled={total === 0} />
+              <div style={{ display: "flex", gap: 10 }}>
+                <BigBtn label="⚖️ Start Weighing" color={`linear-gradient(135deg,${C.gold},#D97706)`} onClick={() => setModal("weighList")} disabled={total === 0} />
+                <button
+                  onClick={() => setModal("walkIn")}
+                  style={{
+                    flexShrink: 0,
+                    background: C.card2, border: `2px dashed ${C.accentBorder}`,
+                    borderRadius: 16, padding: "14px 18px",
+                    color: C.accent, fontSize: 13, fontWeight: 800,
+                    cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  ➕ Walk-in
+                </button>
+              </div>
               <button onClick={() => setModal("cutoff")} style={{
                 background: "transparent", border: `1px solid ${C.border}`,
                 borderRadius: 14, padding: "12px 16px",
@@ -267,7 +283,22 @@ export default function DashboardPage() {
             </div>
           )}
           {stage === "dropoff" && (
-            <BigBtn label={`⚖️ Weigh Packages (${pending.length} remaining)`} color={`linear-gradient(135deg,${C.gold},#D97706)`} onClick={() => setModal("weighList")} />
+            <div style={{ display: "flex", gap: 10 }}>
+              <BigBtn label={`⚖️ Weigh Packages (${pending.length} left)`} color={`linear-gradient(135deg,${C.gold},#D97706)`} onClick={() => setModal("weighList")} />
+              <button
+                onClick={() => setModal("walkIn")}
+                style={{
+                  flexShrink: 0,
+                  background: C.card2, border: `2px dashed ${C.accentBorder}`,
+                  borderRadius: 16, padding: "14px 18px",
+                  color: C.accent, fontSize: 13, fontWeight: 800,
+                  cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ➕ Walk-in
+              </button>
+            </div>
           )}
           {stage === "dropoff_done" && (
             <BigBtn label="✈️ We've Departed" color={`linear-gradient(135deg,${C.purple},#6D28D9)`} onClick={() => setModal("departed")} />
@@ -292,7 +323,7 @@ export default function DashboardPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {bookings.map((b) => {
                 const isWeighed = b.confirmed_weight_kg != null;
-                const lbs = isWeighed ? (b.confirmed_weight_kg! * KG_TO_LB).toFixed(1) : null;
+                const lbs = isWeighed ? (Number(b.confirmed_weight_kg) * KG_TO_LB).toFixed(1) : null;
                 return (
                   <div key={b.id} style={{
                     background: C.card2, border: `1px solid ${C.border}`,
@@ -384,10 +415,19 @@ export default function DashboardPage() {
         <WeighListModal
           trip={trip}
           bookings={bookings}
-          onClose={() => {
-            closeModal();
-            refetchBookings();
+          onClose={() => { closeModal(); refetchBookings(); }}
+          onBookingUpdate={(b) => {
+            handleBookingUpdate(b);
+            fire(`⚖️ ${b.sender_name.split(" ")[0]} weighed`, C.gold);
           }}
+        />
+      )}
+      {modal === "walkIn" && trip && (
+        <WeighListModal
+          trip={trip}
+          bookings={bookings}
+          initialView="walkin"
+          onClose={() => { closeModal(); refetchBookings(); }}
           onBookingUpdate={(b) => {
             handleBookingUpdate(b);
             fire(`⚖️ ${b.sender_name.split(" ")[0]} weighed`, C.gold);

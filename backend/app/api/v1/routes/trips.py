@@ -156,8 +156,27 @@ async def patch(
     operator: Operator = Depends(get_current_operator),
     db: AsyncSession   = Depends(get_db),
 ):
+    from sqlalchemy import update as sa_update
+    from app.models.booking import Booking, BookingStatus
+
     trip = await get_trip(db, trip_id, operator.id)
     trip = await update_trip(db, trip, body, operator)
+
+    # When departing, move all received bookings → in_transit
+    if body.status == TripStatus.in_transit:
+        await db.execute(
+            sa_update(Booking)
+            .where(
+                Booking.trip_id == trip.id,
+                Booking.status == BookingStatus.received,
+            )
+            .values(status=BookingStatus.in_transit)
+            .execution_options(synchronize_session=False)
+        )
+
+    # Commit + re-fetch so updated_at and operator are fresh (avoids MissingGreenlet)
+    await db.commit()
+    trip = await get_trip(db, trip_id, operator.id)
     return TripResponse(**_to_trip_response_dict(trip))
 
 
@@ -186,6 +205,10 @@ async def arrive(
 ):
     trip = await get_trip(db, trip_id, operator.id)
     trip = await process_arrival(db, trip, body)
+
+    # Commit + re-fetch so updated_at and operator are fresh (avoids MissingGreenlet)
+    await db.commit()
+    trip = await get_trip(db, trip_id, operator.id)
 
     # Enqueue personalised WhatsApp blasts to every sender whose booking is ready
     try:

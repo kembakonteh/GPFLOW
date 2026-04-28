@@ -22,6 +22,7 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
   const [loading, setLoading] = useState(false);
   const [updatedBooking, setUpdatedBooking] = useState<Booking>(booking);
   const [screenMode, setScreenMode] = useState(false);
+  const [error, setError] = useState("");
 
   const rateLb = trip.rate_per_kg / KG_TO_LB;
   const lbsNum = parseFloat(lbs) || 0;
@@ -31,6 +32,7 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
   async function confirmWeigh() {
     if (lbsNum <= 0 || loading) return;
     setLoading(true);
+    setError("");
     try {
       const kg = lbsNum / KG_TO_LB;
       const { data } = await api.post<Booking>(`/bookings/${booking.id}/weigh`, {
@@ -38,6 +40,9 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
       });
       setUpdatedBooking(data);
       setState("label");
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : "Failed to save weight — please try again.");
     } finally {
       setLoading(false);
     }
@@ -78,21 +83,36 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
         }}>
           Hold up — sender photographs this label
         </div>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <div style={{ flex: 1, overflowY: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 20px 8px" }}>
           <QRLabel booking={updatedBooking} trip={trip} />
         </div>
-        <button
-          onClick={() => setScreenMode(false)}
-          style={{
-            width: "100%", maxWidth: 540,
-            background: C.accent, color: "#07090F",
-            fontSize: 15, fontWeight: 800,
-            padding: "18px 22px", border: "none", cursor: "pointer",
-            fontFamily: "'DM Sans',sans-serif",
-          }}
-        >
-          ✓ Sender Photographed It — Next Package
-        </button>
+        <div style={{ display: "flex", gap: 0, width: "100%", maxWidth: 540, flexShrink: 0 }}>
+          <button
+            onClick={() => setScreenMode(false)}
+            style={{
+              flex: "0 0 56px",
+              background: C.card2, color: C.textSub,
+              fontSize: 20, fontWeight: 700,
+              padding: "18px 0", border: "none", cursor: "pointer",
+              fontFamily: "'DM Sans',sans-serif",
+              borderRight: `1px solid ${C.border}`,
+            }}
+          >
+            ←
+          </button>
+          <button
+            onClick={() => { onDone(updatedBooking); onBack(); }}
+            style={{
+              flex: 1,
+              background: C.accent, color: "#07090F",
+              fontSize: 15, fontWeight: 800,
+              padding: "18px 22px", border: "none", cursor: "pointer",
+              fontFamily: "'DM Sans',sans-serif",
+            }}
+          >
+            ✓ Done — Next Package
+          </button>
+        </div>
       </div>
     );
   }
@@ -166,6 +186,17 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
               </div>
             )}
 
+            {/* Error */}
+            {error && (
+              <div style={{
+                background: "rgba(244,63,94,0.1)", border: "1px solid rgba(244,63,94,0.3)",
+                borderRadius: 10, padding: "10px 14px", marginBottom: 12,
+                fontSize: 13, color: C.red,
+              }}>
+                ⚠️ {error}
+              </div>
+            )}
+
             {/* CTA */}
             <button
               onClick={confirmWeigh}
@@ -187,60 +218,33 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
           </>
         ) : (
           <>
-            {/* Label state */}
-            <div style={{ textAlign: "center", marginBottom: 8, paddingRight: 40 }}>
-              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>🏷️ QR Label Ready</div>
-            </div>
-
-            {/* Label preview */}
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
-              <div style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.5)", borderRadius: 14 }}>
-                <QRLabel booking={updatedBooking} trip={trip} />
+            {/* Label state — actions FIRST so they're visible without scrolling */}
+            <div style={{ marginBottom: 14, paddingRight: 40 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 2 }}>🏷️ QR Label Ready</div>
+              <div style={{ fontSize: 12, color: C.textSub }}>
+                {updatedBooking.sender_name} · {updatedBooking.reference_number}
               </div>
             </div>
 
-            {/* 3 options */}
+            {/* 3 action buttons — shown immediately */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-              {/* Print */}
-              <button
-                onClick={handlePrint}
-                style={optBtn(C.teal)}
-              >
+              <button onClick={handleScreen} style={optBtn(C.blue)}>
+                <span>📱 Show on Screen</span>
+                <span style={{ fontSize: 12, color: C.textSub }}>Sender photographs label on your phone</span>
+              </button>
+              <button onClick={handleWhatsApp} style={optBtn("#25D366")}>
+                <span>📲 Send via WhatsApp</span>
+                <span style={{ fontSize: 12, color: C.textSub }}>
+                  Sends to {booking.sender_name.split(" ")[0]} to forward to {booking.recipient_name} in {booking.recipient_city}
+                </span>
+              </button>
+              <button onClick={handlePrint} style={optBtn(C.teal)}>
                 <span>🖨️ Print Label</span>
                 <span style={{ fontSize: 12, color: C.textSub }}>Send to printer</span>
               </button>
-
-              {/* Show on screen */}
-              <button
-                onClick={handleScreen}
-                style={optBtn(C.blue)}
-              >
-                <span>📱 Show on Screen</span>
-                <span style={{ fontSize: 12, color: C.textSub }}>Sender photographs label</span>
-              </button>
-
-              {/* WhatsApp */}
-              <button
-                onClick={handleWhatsApp}
-                style={optBtn("#25D366")}
-              >
-                <span>📲 Send to WhatsApp</span>
-                <span style={{ fontSize: 12, color: C.textSub }}>
-                  Sent to {booking.sender_name.split(" ")[0]} with instructions to forward to {booking.recipient_name} in {booking.recipient_city}
-                </span>
-              </button>
             </div>
 
-            {/* No printer note */}
-            <div style={{
-              background: C.card2, border: `1px solid ${C.border}`,
-              borderRadius: 12, padding: "12px 14px", marginBottom: 16,
-              fontSize: 11, color: C.textSub, lineHeight: 1.7,
-            }}>
-              No printer? Use <strong style={{ color: C.text }}>Show on Screen</strong> — sender photographs and forwards to recipient in Gambia. Or <strong style={{ color: C.text }}>Send to WhatsApp</strong>. Reference <code style={{ color: C.teal, fontFamily: "monospace" }}>{booking.reference_number}</code> also works at collection.
-            </div>
-
-            {/* Done button */}
+            {/* Done button — above preview so it's always visible */}
             <button
               onClick={() => { onDone(updatedBooking); onBack(); }}
               style={{
@@ -250,11 +254,19 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
                 padding: "16px 20px", fontSize: 15, fontWeight: 900,
                 cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
                 display: "flex", alignItems: "center", justifyContent: "space-between",
+                marginBottom: 16,
               }}
             >
               <span>✓ Done — Next Package</span>
               <span>→</span>
             </button>
+
+            {/* Label preview — scrollable below */}
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+              <div style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.5)", borderRadius: 14, transform: "scale(0.92)", transformOrigin: "top center" }}>
+                <QRLabel booking={updatedBooking} trip={trip} />
+              </div>
+            </div>
           </>
         )}
       </div>

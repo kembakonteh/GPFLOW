@@ -68,8 +68,7 @@ class CollectionAssignment(BaseModel):
 
 class ArrivalRequest(BaseModel):
     pickup_location:        str
-    pickup_date:            date
-    pickup_time:            str   = Field(..., description="e.g. '10:00am - 4:00pm'")
+    pickup_window:          str   = Field(..., description="e.g. 'May 7 – May 9 · 10am – 4pm daily'")
     pickup_notes:           str   = ""
     collection_assignments: list[CollectionAssignment] = []
 
