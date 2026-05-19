@@ -1,4 +1,3 @@
-import QRCode from "./QRCode";
 import type { Booking, Trip } from "../../types";
 
 interface Props {
@@ -9,11 +8,11 @@ interface Props {
 export default function QRLabel({ booking, trip }: Props) {
   const origin = `${trip.origin_city}, ${trip.origin_country}`;
   const dest   = `${trip.destination_city}, ${trip.destination_country}`;
-  const confKg = booking.confirmed_weight_kg != null ? Number(booking.confirmed_weight_kg) : null;
+  const confKg  = booking.confirmed_weight_kg != null ? Number(booking.confirmed_weight_kg) : null;
   const confLbs = confKg != null ? (confKg * 2.20462).toFixed(1) : null;
   const weightLabel = confLbs != null ? `${confLbs}lbs (${confKg!.toFixed(2)}kg)` : null;
-  const costLabel = booking.confirmed_cost_display ?? null;
-  const trackUrl = `gpflow.app/track/${booking.reference_number}`;
+  const costLabel   = booking.confirmed_cost_display ?? null;
+  const trackUrl    = `gpflow.app/track/${booking.reference_number}`;
 
   return (
     <div style={{
@@ -24,14 +23,11 @@ export default function QRLabel({ booking, trip }: Props) {
       width: "100%", maxWidth: 380,
     }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid #000", paddingBottom: 12 }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 900, letterSpacing: "0.08em", color: "#000" }}>GPFLOW</div>
-          <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>{trip.operator_business_name}</div>
-          <div style={{ fontSize: 10, color: "#555", marginTop: 1 }}>{origin} → {dest}</div>
-          <div style={{ fontSize: 10, color: "#555" }}>Departs {trip.departure_date}</div>
-        </div>
-        <QRCode value={booking.reference_number} size={70} color="#000" bg="#fff" />
+      <div style={{ borderBottom: "2px solid #000", paddingBottom: 12 }}>
+        <div style={{ fontSize: 14, fontWeight: 900, letterSpacing: "0.08em", color: "#000" }}>GPFLOW</div>
+        <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>{trip.operator_business_name}</div>
+        <div style={{ fontSize: 10, color: "#555", marginTop: 1 }}>{origin} → {dest}</div>
+        <div style={{ fontSize: 10, color: "#555" }}>Departs {trip.departure_date}</div>
       </div>
 
       {/* Reference */}
@@ -87,11 +83,8 @@ export default function QRLabel({ booking, trip }: Props) {
 
       {/* Footer */}
       <div style={{ borderTop: "2px solid #000", paddingTop: 10, textAlign: "center" }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: "#000", marginBottom: 4 }}>
-          📱 Show this QR code when collecting
-        </div>
-        <div style={{ fontSize: 9, color: "#888" }}>{trackUrl}</div>
-        <div style={{ fontSize: 9, color: "#888", marginTop: 2 }}>Powered by GPFLOW</div>
+        <div style={{ fontSize: 11, color: "#555", marginBottom: 2 }}>{trackUrl}</div>
+        <div style={{ fontSize: 9, color: "#888" }}>Powered by GPFLOW</div>
       </div>
     </div>
   );

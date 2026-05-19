@@ -263,8 +263,8 @@ async def process_arrival(
 # ── Complete ──────────────────────────────────────────────────────────────────
 
 async def complete_trip(db: AsyncSession, trip: Trip) -> Trip:
-    """Mark trip completed — only when all bookings are collected or delivered."""
-    _allowed = {BookingStatus.collected, BookingStatus.delivered}
+    """Mark trip completed — all bookings must be collected, delivered, or held-over."""
+    _allowed = {BookingStatus.collected, BookingStatus.delivered, BookingStatus.held}
 
     blocking = await db.scalar(
         select(func.count(Booking.id)).where(

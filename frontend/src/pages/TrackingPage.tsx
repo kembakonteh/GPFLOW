@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { C, KG_TO_LB } from "../lib/tokens";
 import WaBubble from "../components/ui/WaBubble";
+import QRCode from "../components/ui/QRCode";
 import type { BookingTracking } from "../types";
 
 // ── Status metadata ─────────────────────────────────────────────────────────
@@ -166,18 +167,57 @@ export default function TrackingPage() {
             ))}
           </div>
 
-          {/* Ready callout */}
-          {booking.status === "ready" && booking.pickup_location && (
-            <div style={{
-              marginTop: 16, background: C.orangeDim, border: `1px solid ${C.orangeBorder}`,
-              borderRadius: 12, padding: "14px 16px",
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: C.orange, marginBottom: 8 }}>🔔 Ready for collection!</div>
-              <div style={{ fontSize: 13, color: C.text }}>📍 {booking.pickup_location}</div>
-              {booking.pickup_window && <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>📅 {booking.pickup_window}</div>}
-              <div style={{ fontSize: 11, color: C.textSub, marginTop: 6 }}>
-                Bring ref: <code style={{ fontFamily: "monospace", color: C.orange, fontWeight: 700 }}>{booking.reference_number}</code>
-              </div>
+          {/* Ready callout + QR code for recipient */}
+          {booking.status === "ready" && (
+            <div style={{ marginTop: 16 }}>
+              {/* QR code — show prominently so recipient can show it when collecting */}
+              <a
+                href={`${window.location.origin}/track/${booking.reference_number}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ textDecoration: "none", display: "block", marginBottom: 12 }}
+              >
+                <div style={{
+                  background: "#fff", borderRadius: 16, padding: "20px 16px 16px",
+                  display: "flex", flexDirection: "column", alignItems: "center",
+                  boxShadow: `0 0 0 3px ${C.orange}`,
+                  cursor: "pointer",
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: "#07090F", marginBottom: 12, textAlign: "center", letterSpacing: "0.04em" }}>
+                    🔔 SHOW THIS QR CODE WHEN COLLECTING
+                  </div>
+                  <QRCode
+                    value={`${window.location.origin}/track/${booking.reference_number}`}
+                    size={200}
+                    color="#07090F"
+                    bg="#ffffff"
+                  />
+                  <div style={{ marginTop: 12, fontFamily: "monospace", fontSize: 15, fontWeight: 800, color: "#07090F", letterSpacing: "0.1em" }}>
+                    {booking.reference_number}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>
+                    {booking.recipient_city} — {booking.item_description}
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 10, color: C.orange, fontWeight: 700 }}>
+                    Tap to open →
+                  </div>
+                </div>
+              </a>
+
+              {/* Pickup details */}
+              {booking.pickup_location && (
+                <div style={{
+                  background: C.orangeDim, border: `1px solid ${C.orangeBorder}`,
+                  borderRadius: 12, padding: "14px 16px",
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: C.orange, marginBottom: 8 }}>📍 Collection details</div>
+                  <div style={{ fontSize: 13, color: C.text }}>📍 {booking.pickup_location}</div>
+                  {booking.pickup_window && <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>📅 {booking.pickup_window}</div>}
+                  <div style={{ fontSize: 11, color: C.textSub, marginTop: 6 }}>
+                    Ref: <code style={{ fontFamily: "monospace", color: C.orange, fontWeight: 700 }}>{booking.reference_number}</code>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

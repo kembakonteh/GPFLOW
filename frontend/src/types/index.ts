@@ -3,7 +3,7 @@
 export type TripDirection  = 'outbound' | 'inbound';
 export type TripStatus     = 'draft' | 'open' | 'closed' | 'in_transit' | 'arrived' | 'completed';
 export type PricingModel   = 'per_kg' | 'per_item' | 'flat';
-export type BookingStatus  = 'confirmed' | 'received' | 'in_transit' | 'ready' | 'collected' | 'delivered';
+export type BookingStatus  = 'confirmed' | 'received' | 'in_transit' | 'ready' | 'collected' | 'delivered' | 'held';
 export type CollectionType = 'self_collect' | 'operator_delivers';
 export type PaymentStatus  = 'unpaid' | 'paid' | 'refunded';
 export type OperatorTier   = 'starter' | 'regular' | 'pro';

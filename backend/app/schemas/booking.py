@@ -51,6 +51,11 @@ class WeighInRequest(BaseModel):
     payment_status: PaymentStatus | None = None
 
 
+class PaymentUpdate(BaseModel):
+    """Operator marks a booking as paid / unpaid / refunded."""
+    payment_status: PaymentStatus
+
+
 class ScanRequest(BaseModel):
     """Operator scans a QR label to record a checkpoint."""
     note: str | None = Field(None, max_length=255)

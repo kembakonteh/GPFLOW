@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLogin } from '../hooks/useAuth';
@@ -8,9 +8,12 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const login    = useLogin();
   const { register, handleSubmit, formState: { errors } } = useForm<LoginRequest>();
+  const [sessionMsg, setSessionMsg] = useState("");
 
   useEffect(() => {
     if (localStorage.getItem('gpflow_access_token')) navigate('/dashboard', { replace: true });
+    const msg = sessionStorage.getItem("gpflow_auth_msg");
+    if (msg) { setSessionMsg(msg); sessionStorage.removeItem("gpflow_auth_msg"); }
   }, [navigate]);
 
   const onSubmit = handleSubmit((data) =>
@@ -37,6 +40,11 @@ export default function LoginPage() {
         <div className="card p-7 shadow-card">
           <h1 className="text-xl font-bold text-text mb-1">Welcome back</h1>
           <p className="text-sm text-sub mb-6">Sign in to your operator account</p>
+          {sessionMsg && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 mb-4">
+              <p className="text-xs text-amber-400">🔒 {sessionMsg}</p>
+            </div>
+          )}
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
               <label className="block text-xs text-sub mb-1.5 font-medium">Email</label>

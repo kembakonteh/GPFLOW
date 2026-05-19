@@ -167,7 +167,7 @@ export default function PublicTripPage() {
           {[
             { icon: "📲", t: "Auto Updates",  s: "Every stage" },
             { icon: "⚖️", t: "We Weigh",      s: "At drop-off" },
-            { icon: "🏷️", t: "QR Label",      s: "On your item" },
+            { icon: "🏷️", t: "Package Label", s: "On your item" },
           ].map(({ icon, t, s }) => (
             <div key={t} style={{
               background: C.card, border: `1px solid ${C.border}`,

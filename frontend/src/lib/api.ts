@@ -69,9 +69,10 @@ api.interceptors.response.use(
       return api(original);
     } catch (refreshError) {
       drainQueue(null, refreshError);
-      // Clear tokens and redirect to login
+      // Clear tokens, show message on login page, redirect
       localStorage.removeItem(ACCESS_KEY);
       localStorage.removeItem(REFRESH_KEY);
+      sessionStorage.setItem("gpflow_auth_msg", "Your session expired — please log in again.");
       window.location.href = "/login";
       return Promise.reject(refreshError);
     } finally {

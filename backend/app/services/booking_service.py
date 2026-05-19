@@ -26,6 +26,7 @@ from app.schemas.booking import (
     BookingCreate,
     BookingResponse,
     BookingTrackingResponse,
+    PaymentUpdate,
     ScanRequest,
     StatusEvent,
     StatusUpdate,
@@ -144,14 +145,40 @@ _STATUS_LABELS: dict[BookingStatus, str] = {
     BookingStatus.ready:      "Ready for collection / delivery",
     BookingStatus.collected:  "Collected",
     BookingStatus.delivered:  "Delivered",
+    BookingStatus.held:       "Held — awaiting next trip",
 }
 
-_STATUS_ORDER = list(BookingStatus)
+# Ordered statuses that form the main linear flow (held is a side-branch)
+_STATUS_ORDER = [
+    BookingStatus.confirmed,
+    BookingStatus.received,
+    BookingStatus.in_transit,
+    BookingStatus.ready,
+    BookingStatus.collected,
+    BookingStatus.delivered,
+]
 
 
 def _build_timeline(current_status: BookingStatus) -> list[StatusEvent]:
+    # For held packages show progress up to "ready", then a held note
+    if current_status == BookingStatus.held:
+        ready_idx = _STATUS_ORDER.index(BookingStatus.ready)
+        events: list[StatusEvent] = []
+        for i, st in enumerate(_STATUS_ORDER):
+            events.append(StatusEvent(
+                status=st.value,
+                label=_STATUS_LABELS[st],
+                occurred_at=datetime.now(UTC) if i <= ready_idx else None,
+            ))
+        events.append(StatusEvent(
+            status=BookingStatus.held.value,
+            label=_STATUS_LABELS[BookingStatus.held],
+            occurred_at=datetime.now(UTC),
+        ))
+        return events
+
     current_idx = _STATUS_ORDER.index(current_status)
-    events: list[StatusEvent] = []
+    events = []
     for i, st in enumerate(_STATUS_ORDER):
         events.append(StatusEvent(
             status=st.value,
@@ -260,6 +287,18 @@ async def get_booking_by_ref(
     booking = result.scalar_one_or_none()
     if booking is None:
         raise not_found("Booking")
+    return booking
+
+
+async def update_payment_status(
+    db: AsyncSession,
+    booking: Booking,
+    body: "PaymentUpdate",
+) -> Booking:
+    """Operator marks a booking as paid, unpaid, or refunded."""
+    booking.payment_status = body.payment_status
+    await db.commit()
+    await db.refresh(booking)
     return booking
 
 

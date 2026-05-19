@@ -30,6 +30,7 @@ from app.schemas.booking import (
     BookingPublicResponse,
     BookingResponse,
     BookingTrackingResponse,
+    PaymentUpdate,
     ScanRequest,
     StatusUpdate,
     WeighInRequest,
@@ -44,6 +45,7 @@ from app.services.booking_service import (
     process_scan,
     process_weigh_in,
     update_booking_status,
+    update_payment_status,
     _to_booking_response,
 )
 
@@ -195,6 +197,20 @@ async def set_status(
     except Exception:
         pass
 
+    return _to_booking_response(booking)
+
+
+# ── PATCH /bookings/{id}/payment ─────────────────────────────────────────────
+
+@router.patch("/{booking_id}/payment", response_model=BookingResponse)
+async def set_payment(
+    booking_id: uuid.UUID,
+    body:       PaymentUpdate,
+    operator:   Operator   = Depends(get_current_operator),
+    db: AsyncSession       = Depends(get_db),
+):
+    booking = await get_booking(db, booking_id, operator.id)
+    booking = await update_payment_status(db, booking, body)
     return _to_booking_response(booking)
 
 

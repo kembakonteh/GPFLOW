@@ -19,6 +19,7 @@ class BookingStatus(str, enum.Enum):
     ready      = "ready"
     collected  = "collected"
     delivered  = "delivered"
+    held       = "held"       # package not picked up — held for next trip
 
 
 class CollectionType(str, enum.Enum):

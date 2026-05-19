@@ -74,8 +74,15 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
       });
       onCreated(data);
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg || "Failed to publish trip. Please try again.");
+      const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      const msg = Array.isArray(detail)
+        ? detail.map((d: { msg?: string; loc?: string[] }) =>
+            `${d.loc?.slice(1).join(" → ") ?? "field"}: ${d.msg ?? "invalid"}`
+          ).join(", ")
+        : typeof detail === "string"
+          ? detail
+          : "Failed to publish trip. Please try again.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -209,10 +216,32 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
               </div>
             </div>
 
+            {/* Date validation errors */}
+            {departDate && cutoffDate && (() => {
+              const today = new Date(); today.setHours(0,0,0,0);
+              const depart = new Date(departDate);
+              const cutoff = new Date(cutoffDate);
+              if (depart <= today) return (
+                <div style={{ marginTop: 10, fontSize: 12, color: "#F43F5E" }}>⚠️ Departure date must be in the future.</div>
+              );
+              if (cutoff >= depart) return (
+                <div style={{ marginTop: 10, fontSize: 12, color: "#F43F5E" }}>⚠️ Drop-off deadline must be before departure date.</div>
+              );
+              return null;
+            })()}
+
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <button onClick={() => setStep(0)} style={backBtn}>← Back</button>
               <button
-                onClick={() => setStep(2)}
+                onClick={() => {
+                  const today = new Date(); today.setHours(0,0,0,0);
+                  const depart = new Date(departDate);
+                  const cutoff = new Date(cutoffDate);
+                  if (!departDate || !cutoffDate) return;
+                  if (depart <= today) return;
+                  if (cutoff >= depart) return;
+                  setStep(2);
+                }}
                 disabled={!departDate || !cutoffDate}
                 style={{ ...ctaBtn(!!(departDate && cutoffDate)), flex: 2 }}
               >

@@ -7,6 +7,26 @@ interface Props {
   operatorName?: string;
 }
 
+/** Split message text at URLs and render links as tappable anchors */
+function renderWithLinks(text: string) {
+  const parts = text.split(/(https?:\/\/[^\s]+)/g);
+  return parts.map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <a
+        key={i}
+        href={part}
+        target="_blank"
+        rel="noreferrer"
+        style={{ color: "#4FC3F7", textDecoration: "underline", wordBreak: "break-all" }}
+      >
+        {part}
+      </a>
+    ) : (
+      part
+    )
+  );
+}
+
 export default function WaBubble({ msg, time, isNew = false, operatorName = "Operator" }: Props) {
   const initial = operatorName.charAt(0).toUpperCase();
   return (
@@ -31,7 +51,9 @@ export default function WaBubble({ msg, time, isNew = false, operatorName = "Ope
           background: "#131E30", borderRadius: "4px 16px 16px 16px",
           padding: "12px 14px", border: `1px solid ${C.border}`,
         }}>
-          <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.85, whiteSpace: "pre-line" }}>{msg}</div>
+          <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.85, whiteSpace: "pre-line" }}>
+            {renderWithLinks(msg)}
+          </div>
           <div style={{
             fontSize: 10, color: C.textDim, marginTop: 8,
             textAlign: "right", display: "flex", justifyContent: "flex-end", gap: 4,

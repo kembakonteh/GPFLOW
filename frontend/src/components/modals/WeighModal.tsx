@@ -56,18 +56,22 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
     setScreenMode(true);
   }
 
-  async function handleWhatsApp() {
-    const fn = booking.sender_name.split(" ")[0];
-    const recipient = booking.recipient_name;
-    const city = booking.recipient_city;
-    const ref = booking.reference_number;
+  // Build the WhatsApp URL at render time so it can be used as a plain <a href>
+  const waHref = (() => {
+    const fn = updatedBooking.sender_name.split(" ")[0];
+    const recipient = updatedBooking.recipient_name;
+    const city = updatedBooking.recipient_city;
+    const ref = updatedBooking.reference_number;
     const op = trip.operator_business_name;
+    const trackUrl = `${window.location.origin}/track/${ref}`;
     const msg = encodeURIComponent(
-      `Hi ${fn} 👋\nHere is the QR label for ${recipient}'s package 🏷️\n\nPlease forward this to ${recipient} in ${city} so they can show it when collecting. They'll need it to pick up the package.\n\nRef: ${ref}\n— ${op} via GPFLOW`
+      `Hi ${fn} 👋\nHere is the tracking link for ${recipient}'s package 🏷️\n\n` +
+      `📲 ${trackUrl}\n\n` +
+      `Please forward this to ${recipient} in ${city} so they can track the package and show their reference number when collecting.\n\n` +
+      `Ref: ${ref}\n— ${op} via GPFLOW`
     );
-    const phone = booking.sender_phone?.replace(/\D/g, "") ?? "";
-    window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
-  }
+    return `https://wa.me/?text=${msg}`;
+  })();
 
   if (screenMode) {
     return (
@@ -81,7 +85,7 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
           padding: "16px 20px", textAlign: "center",
           fontSize: 13, fontWeight: 700,
         }}>
-          Hold up — sender photographs this label
+          Hold up — sender takes a screenshot of this label
         </div>
         <div style={{ flex: 1, overflowY: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 20px 8px" }}>
           <QRLabel booking={updatedBooking} trip={trip} />
@@ -212,7 +216,7 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
                 display: "flex", alignItems: "center", justifyContent: "space-between",
               }}
             >
-              <span>{loading ? "Saving…" : `Confirm ${lbsNum > 0 ? lbsNum : ""}lbs · ${currSym}${cost} → Get QR Label`}</span>
+              <span>{loading ? "Saving…" : `Confirm ${lbsNum > 0 ? lbsNum : ""}lbs · ${currSym}${cost} → Get Label`}</span>
               {!loading && <span>→</span>}
             </button>
           </>
@@ -229,15 +233,15 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
             {/* 3 action buttons — shown immediately */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
               <button onClick={handleScreen} style={optBtn(C.blue)}>
-                <span>📱 Show on Screen</span>
-                <span style={{ fontSize: 12, color: C.textSub }}>Sender photographs label on your phone</span>
+                <span>📱 Show Label on Screen</span>
+                <span style={{ fontSize: 12, color: C.textSub }}>Sender takes a screenshot for their records</span>
               </button>
-              <button onClick={handleWhatsApp} style={optBtn("#25D366")}>
+              <a href={waHref} style={{ ...optBtn("#25D366"), textDecoration: "none" }}>
                 <span>📲 Send via WhatsApp</span>
                 <span style={{ fontSize: 12, color: C.textSub }}>
                   Sends to {booking.sender_name.split(" ")[0]} to forward to {booking.recipient_name} in {booking.recipient_city}
                 </span>
-              </button>
+              </a>
               <button onClick={handlePrint} style={optBtn(C.teal)}>
                 <span>🖨️ Print Label</span>
                 <span style={{ fontSize: 12, color: C.textSub }}>Send to printer</span>

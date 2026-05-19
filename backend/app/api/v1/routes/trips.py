@@ -232,7 +232,10 @@ async def complete(
     operator: Operator = Depends(get_current_operator),
     db: AsyncSession   = Depends(get_db),
 ):
+    trip = await get_trip(db, trip_id, operator.id)
+    trip = await complete_trip(db, trip)
+    # Commit + re-fetch so updated_at and operator are fresh (avoids MissingGreenlet)
+    await db.commit()
     trip  = await get_trip(db, trip_id, operator.id)
-    trip  = await complete_trip(db, trip)
     stats = await get_trip_stats(db, trip.id)
     return TripResponse(**_to_trip_response_dict(trip, booking_counts=stats))

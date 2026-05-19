@@ -163,14 +163,48 @@ export default function BookingConfirmedPage() {
           borderRadius: 16, padding: "18px 20px", marginBottom: 22,
         }}>
           <div style={{ fontSize: 11, color: C.textSub, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>What happens next</div>
+          {/* Step 1 — Contact operator */}
+          <div style={{ display: "flex", gap: 14, padding: "10px 0", borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: 20, flexShrink: 0, marginTop: 1 }}>📞</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>Contact the operator</div>
+              <div style={{ fontSize: 12, color: C.textSub, marginTop: 2, marginBottom: 10 }}>
+                Reach out to {op} to arrange your drop-off before {cutoffFmt}.
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <a
+                  href={`https://wa.me/${trip.operator_phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi, I just booked with ${op}. My ref is ${ref}. I'd like to arrange my drop-off.`)}`}
+                  target="_blank" rel="noreferrer"
+                  style={{
+                    flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    background: "#25D366", border: "none", borderRadius: 10, padding: "9px 12px",
+                    color: "#07090F", fontSize: 12, fontWeight: 800, textDecoration: "none",
+                  }}
+                >
+                  💬 WhatsApp
+                </a>
+                <a
+                  href={`tel:${trip.operator_phone}`}
+                  style={{
+                    flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    background: C.card2, border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 12px",
+                    color: C.text, fontSize: 12, fontWeight: 800, textDecoration: "none",
+                  }}
+                >
+                  📞 Call
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Steps 2 & 3 */}
           {[
-            { icon: "📞", step: "Operator contacts you",  desc: `${op} will reach out to arrange drop-off before ${cutoffFmt}.` },
             { icon: "⚖️", step: "Weighed at drop-off",   desc: "Operator weighs your item. Final cost locked and sent to you via WhatsApp." },
             { icon: "📲", step: "Automatic updates",     desc: "WhatsApp at every stage — Received, In Transit, Arrived, Delivered." },
           ].map(({ icon, step, desc }, i) => (
             <div key={i} style={{
               display: "flex", gap: 14, padding: "10px 0",
-              borderBottom: i < 2 ? `1px solid ${C.border}` : "none",
+              borderBottom: i === 0 ? `1px solid ${C.border}` : "none",
             }}>
               <div style={{ fontSize: 20, flexShrink: 0, marginTop: 1 }}>{icon}</div>
               <div>

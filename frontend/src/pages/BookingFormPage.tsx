@@ -49,6 +49,7 @@ export default function BookingFormPage() {
   const [recipientName, setRecipientName] = useState("");
   const [recipientCity, setRecipientCity] = useState("");
   const [itemDesc,      setItemDesc]      = useState("");
+  const [quantity,      setQuantity]      = useState(1);
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState("");
 
@@ -70,7 +71,7 @@ export default function BookingFormPage() {
         recipient_name:      recipientName,
         recipient_city:      recipientCity,
         item_description:    itemDesc,
-        quantity:            1,
+        quantity,
         estimated_weight_kg: 0,
       });
       navigate(`/booking/${data.reference_number}/confirmed`, { state: { booking: data, trip } });
@@ -151,12 +152,46 @@ export default function BookingFormPage() {
             onChange={(e) => setItemDesc(e.target.value)}
             placeholder="e.g. Winter jacket, medicine, shoes"
             rows={3}
-            style={{
-              ...inp,
-              resize: "none",
-              lineHeight: 1.6,
-            }}
+            style={{ ...inp, resize: "none", lineHeight: 1.6 }}
           />
+
+          {/* Quantity picker */}
+          <div style={{ marginTop: 16 }}>
+            <label style={lbl}>Number of packages</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 0, marginTop: 6 }}>
+              <button
+                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                style={{
+                  width: 48, height: 48, borderRadius: "10px 0 0 10px",
+                  background: "#0A0E1A", border: `1px solid ${C.border}`,
+                  color: C.text, fontSize: 22, fontWeight: 700,
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >−</button>
+              <div style={{
+                flex: 1, height: 48,
+                background: "#0A0E1A", borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 20, fontWeight: 800, color: C.text,
+              }}>
+                {quantity}
+              </div>
+              <button
+                onClick={() => setQuantity((q) => Math.min(20, q + 1))}
+                style={{
+                  width: 48, height: 48, borderRadius: "0 10px 10px 0",
+                  background: "#0A0E1A", border: `1px solid ${C.border}`,
+                  color: C.text, fontSize: 22, fontWeight: 700,
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >+</button>
+            </div>
+            {quantity > 1 && (
+              <div style={{ fontSize: 11, color: C.textSub, marginTop: 6 }}>
+                Each package will be weighed and charged separately at drop-off.
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Error */}
