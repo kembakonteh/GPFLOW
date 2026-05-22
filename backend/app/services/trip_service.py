@@ -1,15 +1,15 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import and_, case, func, select, update
+from sqlalchemy import and_, case, delete as sa_delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.errors import forbidden, not_found, validation_error
 from app.models.booking import Booking, BookingStatus, PaymentStatus
 from app.models.operator import WeightUnit
-from app.models.trip import Trip, TripDirection, TripStatus
+from app.models.trip import Trip, TripDirection, TripDropoffLocation, TripStatus
 from app.schemas.trip import ArrivalRequest, TripCreate, TripUpdate
 from app.utils.slug import generate_trip_slug
 from app.utils.units import KG_TO_LB
@@ -75,17 +75,32 @@ def _to_trip_response_dict(trip: Trip, booking_counts: dict | None = None) -> di
         "pickup_window":       trip.pickup_window,
         "pickup_notes":        trip.pickup_notes,
         "arrived_at":          trip.arrived_at,
+        "arrival_notified_at": trip.arrival_notified_at,
         "created_at":          trip.created_at,
         "updated_at":          trip.updated_at,
         "operator_name":          trip.operator.name,
         "operator_business_name": trip.operator.business_name,
         "booking_counts":         booking_counts,
+        "drop_off_locations": [
+            {
+                "id":            loc.id,
+                "label":         loc.label,
+                "address":       loc.address,
+                "city":          loc.city,
+                "state":         loc.state,
+                "display_order": loc.display_order,
+            }
+            for loc in sorted(trip.drop_off_locations, key=lambda l: l.display_order)
+        ],
     }
 
 
 def _with_operator(stmt):
-    """Add selectinload(Trip.operator) to a select statement."""
-    return stmt.options(selectinload(Trip.operator))
+    """Eagerly load operator and drop_off_locations on every trip query."""
+    return stmt.options(
+        selectinload(Trip.operator),
+        selectinload(Trip.drop_off_locations),
+    )
 
 
 # ── CRUD ──────────────────────────────────────────────────────────────────────
@@ -125,6 +140,23 @@ async def create_trip(
     )
     db.add(trip)
     await db.flush()
+
+    # Bulk-insert drop-off locations and attach to trip for in-memory access
+    loc_objs: list[TripDropoffLocation] = []
+    for loc in data.drop_off_locations:
+        loc_obj = TripDropoffLocation(
+            id=uuid.uuid4(),
+            trip_id=trip.id,
+            label=loc.label,
+            address=loc.address,
+            city=loc.city,
+            state=loc.state,
+            display_order=loc.display_order,
+        )
+        db.add(loc_obj)
+        loc_objs.append(loc_obj)
+    trip.drop_off_locations = loc_objs
+
     # Attach operator so direction_badge / response building works without an extra query
     trip.operator = operator
     return trip
@@ -174,7 +206,9 @@ async def update_trip(
     data: TripUpdate,
     operator,
 ) -> Trip:
-    update_data = data.model_dump(exclude_unset=True)
+    # Extract drop_off_locations before dumping (it's a relationship, not a column)
+    new_locs = data.drop_off_locations if "drop_off_locations" in data.model_fields_set else None
+    update_data = data.model_dump(exclude_unset=True, exclude={"drop_off_locations"})
 
     # Convert rate if operator uses lbs
     if "rate_per_kg" in update_data and operator.weight_unit == WeightUnit.lbs:
@@ -187,6 +221,20 @@ async def update_trip(
 
     for field, value in update_data.items():
         setattr(trip, field, value)
+
+    # Replace drop-off locations when explicitly provided
+    if new_locs is not None:
+        await db.execute(sa_delete(TripDropoffLocation).where(TripDropoffLocation.trip_id == trip.id))
+        for loc in new_locs:
+            db.add(TripDropoffLocation(
+                id=uuid.uuid4(),
+                trip_id=trip.id,
+                label=loc.label,
+                address=loc.address,
+                city=loc.city,
+                state=loc.state,
+                display_order=loc.display_order,
+            ))
 
     await db.flush()
     return trip
@@ -341,6 +389,103 @@ async def get_trip_stats(db: AsyncSession, trip_id: uuid.UUID) -> dict:
         "delivered_weight_kg": float(row.delivered_weight_kg),
         "total_revenue_minor": int(row.total_revenue_minor),
     }
+
+
+def build_announcement(trip: Trip) -> dict:
+    """
+    Build a WhatsApp-ready announcement message for a trip.
+    Requires trip.operator and trip.drop_off_locations to be loaded.
+    """
+    from app.core.config import settings
+
+    def _fmt_date(d: date) -> str:
+        return d.strftime("%A, %B") + f" {d.day}"
+
+    dest_flag  = _FLAG.get(trip.destination_country.upper(), "")
+    dest_label = f"{trip.destination_city} {dest_flag}".strip()
+
+    rate = compute_rate_display(
+        trip.rate_per_kg,
+        trip.currency,
+        trip.operator.weight_unit.value,
+    )
+
+    frontend_url = str(settings.FRONTEND_URL).rstrip("/")
+    public_url   = f"{frontend_url}/trip/{trip.public_slug}"
+
+    lines: list[str] = [
+        f"✈️ *{trip.operator.business_name} — Trip to {dest_label}*",
+        "",
+        f"📅 Leaving: {_fmt_date(trip.departure_date)}",
+        f"📦 Last day to send: {_fmt_date(trip.cutoff_date)}",
+        f"💰 {rate}",
+    ]
+
+    locs = sorted(trip.drop_off_locations, key=lambda l: l.display_order)
+    if locs:
+        lines += ["", "📍 Drop-off Locations:"]
+        lines += [f"• {loc.label}" for loc in locs]
+
+    lines += [
+        "",
+        "📲 Book or track your parcel:",
+        public_url,
+        "",
+        f"📞 Contact: {trip.operator.phone}",
+    ]
+
+    return {"whatsapp_message": "\n".join(lines), "public_url": public_url}
+
+
+async def notify_arrival_blast(
+    db: AsyncSession,
+    trip: Trip,
+) -> tuple[int, int]:
+    """
+    Send arrival WhatsApp notifications to all senders whose bookings made it.
+    Queries ready/collected/delivered/held bookings, sends gpflow_arrived_sender
+    to each, then stamps trip.arrival_notified_at.
+
+    Returns (sent_count, failed_count).
+    Never raises — notification errors are logged inside send_arrived_sender.
+    """
+    from app.services.notification_service import send_arrived_sender
+
+    if trip.status not in (TripStatus.arrived, TripStatus.completed):
+        raise validation_error("Trip must be arrived or completed to send arrival notifications")
+
+    _arrived_statuses = [
+        BookingStatus.ready,
+        BookingStatus.collected,
+        BookingStatus.delivered,
+        BookingStatus.held,
+    ]
+
+    result = await db.execute(
+        select(Booking)
+        .where(
+            and_(
+                Booking.trip_id == trip.id,
+                Booking.status.in_(_arrived_statuses),
+            )
+        )
+        .options(
+            selectinload(Booking.trip),
+            selectinload(Booking.operator),
+        )
+    )
+    bookings = result.scalars().all()
+
+    sent = failed = 0
+    for booking in bookings:
+        ok = await send_arrived_sender(db, booking)
+        if ok:
+            sent += 1
+        else:
+            failed += 1
+
+    trip.arrival_notified_at = datetime.now(UTC)
+    return sent, failed
 
 
 async def compute_spots_remaining(db: AsyncSession, trip: Trip) -> int | None:

@@ -33,6 +33,12 @@ class PaymentStatus(str, enum.Enum):
     refunded = "refunded"
 
 
+class PackageScanStatus(str, enum.Enum):
+    pending   = "pending"
+    received  = "received"
+    delivered = "delivered"
+
+
 # ── Model ─────────────────────────────────────────────────────────────────────
 
 class Booking(Base):
@@ -108,6 +114,15 @@ class Booking(Base):
     last_scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     scan_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
+    # ── Delivery address — where operator delivers when collection_type = operator_delivers ─
+    delivery_address_line1: Mapped[str | None] = mapped_column(String(255))
+    delivery_address_line2: Mapped[str | None] = mapped_column(String(255))
+    delivery_city:          Mapped[str | None] = mapped_column(String(100))
+    delivery_state:         Mapped[str | None] = mapped_column(String(100))
+    delivery_zip:           Mapped[str | None] = mapped_column(String(20))
+    delivery_country:       Mapped[str | None] = mapped_column(String(2))
+    delivery_notes:         Mapped[str | None] = mapped_column(String(500))
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -116,13 +131,48 @@ class Booking(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
+    # ── Package count (determines how many BookingPackage rows to create) ─────
+    package_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+
     # ── Relationships ──────────────────────────────────────────────────────
     trip:              Mapped["Trip"]                    = relationship("Trip",            back_populates="bookings")
     operator:          Mapped["Operator"]                = relationship("Operator")
     notification_logs: Mapped[list["NotificationLog"]]   = relationship("NotificationLog", back_populates="booking")
+    packages:          Mapped[list["BookingPackage"]]    = relationship("BookingPackage",  back_populates="booking", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return (
             f"<Booking id={self.id} ref={self.reference_number!r} "
             f"status={self.status.value}>"
         )
+
+
+# ── BookingPackage ─────────────────────────────────────────────────────────────
+
+class BookingPackage(Base):
+    __tablename__ = "booking_packages"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    booking_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("bookings.id", ondelete="CASCADE"), nullable=False
+    )
+
+    package_number:    Mapped[int]            = mapped_column(Integer, nullable=False)
+    description:       Mapped[str | None]     = mapped_column(String(200))
+    weight_kg:         Mapped[Decimal | None] = mapped_column(Numeric(8, 3))
+    qr_code:           Mapped[str | None]     = mapped_column(String(512))
+    package_reference: Mapped[str]            = mapped_column(String(30), unique=True, nullable=False)
+
+    scan_status: Mapped[PackageScanStatus] = mapped_column(
+        SAEnum(PackageScanStatus, name="package_scan_status", values_callable=lambda e: [m.value for m in e]),
+        nullable=False,
+        default=PackageScanStatus.pending,
+        server_default=PackageScanStatus.pending.value,
+    )
+    scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime]        = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    booking: Mapped["Booking"] = relationship("Booking", back_populates="packages")
+
+    def __repr__(self) -> str:
+        return f"<BookingPackage ref={self.package_reference!r} scan={self.scan_status.value}>"

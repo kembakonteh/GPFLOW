@@ -8,6 +8,25 @@ from app.models.booking import CollectionType
 from app.models.trip import PricingModel, TripDirection, TripStatus
 
 
+# ── Drop-off location schemas ─────────────────────────────────────────────────
+
+class DropoffLocationCreate(BaseModel):
+    label:         str            = Field(..., min_length=1)
+    address:       str | None     = None
+    city:          str | None     = None
+    state:         str | None     = None
+    display_order: int            = 0
+
+
+class DropoffLocationResponse(BaseModel):
+    id:            uuid.UUID
+    label:         str
+    address:       str | None
+    city:          str | None
+    state:         str | None
+    display_order: int
+
+
 # ── Create / Update ───────────────────────────────────────────────────────────
 
 class TripCreate(BaseModel):
@@ -23,8 +42,9 @@ class TripCreate(BaseModel):
     rate_per_kg:         Decimal        = Field(..., gt=0, description="Rate in operator's display unit — converted to kg/unit server-side")
     currency:            str            = Field("USD", min_length=3, max_length=3)
     capacity_kg:         Decimal | None = Field(None, gt=0)
-    accepted_item_types: list[str]      = []
-    customs_advisory:    str | None     = None
+    accepted_item_types: list[str]                = []
+    customs_advisory:    str | None               = None
+    drop_off_locations:  list[DropoffLocationCreate] = []
 
     @model_validator(mode="after")
     def validate_trip(self) -> "TripCreate":
@@ -54,9 +74,10 @@ class TripUpdate(BaseModel):
     rate_per_kg:         Decimal | None       = Field(None, gt=0)
     currency:            str | None           = Field(None, min_length=3, max_length=3)
     capacity_kg:         Decimal | None       = None   # None means "clear"
-    accepted_item_types: list[str] | None     = None
-    customs_advisory:    str | None           = None
-    status:              TripStatus | None    = None
+    accepted_item_types: list[str] | None                = None
+    customs_advisory:    str | None                      = None
+    status:              TripStatus | None               = None
+    drop_off_locations:  list[DropoffLocationCreate] | None = None
 
 
 # ── Arrival ───────────────────────────────────────────────────────────────────
@@ -100,13 +121,15 @@ class TripResponse(BaseModel):
     pickup_window:       str | None
     pickup_notes:        str | None
     arrived_at:          datetime | None
+    arrival_notified_at: datetime | None
     created_at:          datetime
     updated_at:          datetime
     # Denormalised operator fields
     operator_name:          str
     operator_business_name: str
     # Populated only for single-trip fetches
-    booking_counts: dict | None = None
+    booking_counts:    dict | None                   = None
+    drop_off_locations: list[DropoffLocationResponse] = []
 
 
 class PublicTripResponse(BaseModel):
@@ -137,3 +160,26 @@ class PublicTripResponse(BaseModel):
     operator_name:          str
     operator_business_name: str
     operator_phone:         str
+    # Operator mailing address — shown on public trip page so customers can mail packages
+    operator_mailing_address_line1: str | None = None
+    operator_mailing_address_line2: str | None = None
+    operator_mailing_city:          str | None = None
+    operator_mailing_state:         str | None = None
+    operator_mailing_zip:           str | None = None
+    operator_mailing_country:       str | None = None
+    operator_mailing_instructions:  str | None = None
+    drop_off_locations:     list[DropoffLocationResponse] = []
+
+
+# ── Notify-arrival response ───────────────────────────────────────────────────
+
+class NotifyArrivalResponse(BaseModel):
+    notified: int
+    failed:   int
+
+
+# ── Trip announcement ─────────────────────────────────────────────────────────
+
+class TripAnnouncementResponse(BaseModel):
+    whatsapp_message: str
+    public_url:       str

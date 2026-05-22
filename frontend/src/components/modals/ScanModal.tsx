@@ -30,7 +30,8 @@ export default function ScanModal({ trip, bookings, onClose, onDelivered }: Prop
         b.recipient_name.toLowerCase().includes(q) ||
         b.sender_name.toLowerCase().includes(q) ||
         b.reference_number.toLowerCase().includes(q) ||
-        b.recipient_city.toLowerCase().includes(q)
+        b.recipient_city.toLowerCase().includes(q) ||
+        b.packages.some((p) => p.package_reference.toLowerCase().includes(q))
       )
     : pending;
 
@@ -219,9 +220,20 @@ export default function ScanModal({ trip, bookings, onClose, onDelivered }: Prop
             }}>
               {action === "collected" ? "Collected!" : action === "delivered" ? "Delivered!" : "Held Over"}
             </div>
-            <div style={{ fontSize: 13, color: C.textSub, marginBottom: 20 }}>
+            <div style={{ fontSize: 13, color: C.textSub, marginBottom: 6 }}>
               {selected.recipient_name} · {selected.recipient_city}
             </div>
+            {selected.package_count > 1 && (
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                background: C.accentDim, border: `1px solid ${C.accentBorder}`,
+                borderRadius: 8, padding: "4px 12px", marginBottom: 14,
+                fontSize: 12, fontWeight: 700, color: C.accent,
+              }}>
+                ✓ All {selected.package_count} packages {action === "held" ? "held" : action}
+              </div>
+            )}
+            {selected.package_count === 1 && <div style={{ marginBottom: 14 }} />}
 
             {/* Held — show a note instead of WA confirmation */}
             {action === "held" ? (

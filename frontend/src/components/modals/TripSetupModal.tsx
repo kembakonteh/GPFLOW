@@ -3,7 +3,7 @@ import { C } from "../../lib/tokens";
 import { api } from "../../lib/api";
 import Modal from "../ui/Modal";
 import CloseBtn from "../ui/CloseBtn";
-import type { Trip } from "../../types";
+import type { Trip, TripAnnouncement } from "../../types";
 
 const ITEM_TYPES = ["👕 Clothes", "💊 Medicine", "📱 Electronics", "📄 Documents", "👟 Shoes", "🍼 Baby Items", "🍲 Food", "💼 Other"];
 const CURRENCIES = ["USD", "GBP", "EUR"];
@@ -24,9 +24,13 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
   const [itemTypes, setItemTypes] = useState<string[]>([]);
   const [rateLb, setRateLb] = useState("");
   const [currency, setCurrency] = useState("USD");
+  const [dropoffLocs, setDropoffLocs] = useState<{ label: string; address: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [createdTrip, setCreatedTrip] = useState<Trip | null>(null);
+  const [announcement, setAnnouncement] = useState<TripAnnouncement | null>(null);
+  const [annCopied, setAnnCopied] = useState(false);
 
   const rateLbNum = parseFloat(rateLb) || 0;
   const slug = `trip-${Date.now()}`;
@@ -48,6 +52,16 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
     );
   }
 
+  function addDropoffLoc() {
+    setDropoffLocs((prev) => [...prev, { label: "", address: "" }]);
+  }
+  function updateDropoffLoc(idx: number, field: "label" | "address", value: string) {
+    setDropoffLocs((prev) => prev.map((loc, i) => i === idx ? { ...loc, [field]: value } : loc));
+  }
+  function removeDropoffLoc(idx: number) {
+    setDropoffLocs((prev) => prev.filter((_, i) => i !== idx));
+  }
+
   async function publish() {
     if (loading) return;
     setLoading(true);
@@ -59,7 +73,7 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
       // Always use 2-char ISO codes based on direction
       const originCountry = direction === "inbound"  ? "GM" : "US";
       const destCountry   = direction === "inbound"  ? "US" : "GM";
-      const { data } = await api.post<Trip>("/trips", {
+      const { data: trip } = await api.post<Trip>("/trips", {
         direction: direction ?? "outbound",
         origin_city: originCity,
         origin_country: originCountry,
@@ -71,8 +85,27 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
         rate_per_kg: ratePerKg,
         currency,
         accepted_item_types: itemTypes,
+        drop_off_locations: dropoffLocs
+          .filter((loc) => loc.label.trim())
+          .map((loc, i) => ({
+            label:         loc.label.trim(),
+            address:       loc.address.trim() || undefined,
+            display_order: i,
+          })),
       });
-      onCreated(data);
+      setCreatedTrip(trip);
+      // Fetch the formatted announcement from the backend
+      try {
+        const { data: ann } = await api.get<TripAnnouncement>(`/trips/${trip.id}/announcement`);
+        setAnnouncement(ann);
+      } catch {
+        // If the fetch fails, build a minimal fallback so the modal doesn't get stuck
+        setAnnouncement({
+          whatsapp_message: `✈️ ${trip.operator_business_name} — New trip!\n\n📲 Book your spot:\n${window.location.origin}/trip/${trip.public_slug}`,
+          public_url: `${window.location.origin}/trip/${trip.public_slug}`,
+        });
+      }
+      setStep(4);
     } catch (e: unknown) {
       const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
       const msg = Array.isArray(detail)
@@ -214,6 +247,49 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
                   ))}
                 </div>
               </div>
+
+              {/* Drop-off Locations */}
+              <div>
+                <label style={lbl}>Drop-off Locations (optional)</label>
+                {dropoffLocs.map((loc, idx) => (
+                  <div key={idx} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                      <input
+                        value={loc.label}
+                        onChange={(e) => updateDropoffLoc(idx, "label", e.target.value)}
+                        placeholder="e.g. African Supermart – Lynnwood"
+                        style={inp}
+                      />
+                      <input
+                        value={loc.address}
+                        onChange={(e) => updateDropoffLoc(idx, "address", e.target.value)}
+                        placeholder="Address (optional)"
+                        style={{ ...inp, fontSize: 12, padding: "9px 14px" }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => removeDropoffLoc(idx)}
+                      style={{
+                        background: "transparent", border: `1px solid ${C.border}`,
+                        borderRadius: 8, padding: "10px 11px",
+                        color: C.textSub, cursor: "pointer",
+                        fontFamily: "'DM Sans',sans-serif",
+                        fontSize: 14, flexShrink: 0, marginTop: 2,
+                      }}
+                    >🗑</button>
+                  </div>
+                ))}
+                <button
+                  onClick={addDropoffLoc}
+                  style={{
+                    background: C.card2, border: `1px dashed ${C.border}`,
+                    borderRadius: 10, padding: "10px 14px",
+                    color: C.textSub, fontSize: 13, fontWeight: 600,
+                    cursor: "pointer", width: "100%", textAlign: "center",
+                    fontFamily: "'DM Sans',sans-serif",
+                  }}
+                >+ Add Location</button>
+              </div>
             </div>
 
             {/* Date validation errors */}
@@ -320,6 +396,62 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
                 <span>Continue →</span>
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Step 5 — Share Announcement (post-publish) */}
+        {step === 4 && announcement && createdTrip && (
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>📢 Share This Trip</div>
+            <div style={{ fontSize: 13, color: C.textSub, marginBottom: 18 }}>
+              Paste this directly to your WhatsApp Status or broadcast list.
+            </div>
+
+            {/* Message textarea */}
+            <textarea
+              readOnly
+              value={announcement.whatsapp_message}
+              style={{
+                width: "100%", background: C.card2,
+                border: `1px solid ${C.border}`, borderRadius: 12,
+                padding: "14px", color: C.text, fontSize: 12.5,
+                fontFamily: "monospace", lineHeight: 1.7,
+                resize: "none", outline: "none", boxSizing: "border-box",
+                minHeight: 200,
+              }}
+              rows={12}
+            />
+
+            <div style={{ display: "flex", gap: 10, marginTop: 10, marginBottom: 18, alignItems: "center" }}>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(announcement.whatsapp_message);
+                  setAnnCopied(true);
+                  setTimeout(() => setAnnCopied(false), 2000);
+                }}
+                style={{
+                  background: annCopied ? C.accent : C.accentDim,
+                  border: `1px solid ${C.accentBorder}`,
+                  borderRadius: 10, padding: "9px 18px",
+                  color: annCopied ? "#07090F" : C.accent,
+                  fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  fontFamily: "'DM Sans',sans-serif", flexShrink: 0,
+                }}
+              >
+                {annCopied ? "Copied ✓" : "📋 Copy Message"}
+              </button>
+              <span style={{ fontSize: 11, color: C.textDim, lineHeight: 1.4 }}>
+                Paste to WhatsApp Status or broadcast list
+              </span>
+            </div>
+
+            <button
+              onClick={() => onCreated(createdTrip)}
+              style={ctaBtn(true)}
+            >
+              <span>Done — Go to Dashboard</span>
+              <span>→</span>
+            </button>
           </div>
         )}
 

@@ -13,12 +13,12 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal, ROUND_HALF_UP
 
-from sqlalchemy import func, select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.errors import not_found, validation_error, forbidden
-from app.models.booking import Booking, BookingStatus, CollectionType, PaymentStatus
+from app.models.booking import Booking, BookingPackage, BookingStatus, CollectionType, PackageScanStatus, PaymentStatus
 from app.models.operator import Operator
 from app.models.operator_contact import OperatorContact
 from app.models.trip import Trip, TripStatus
@@ -26,6 +26,7 @@ from app.schemas.booking import (
     BookingCreate,
     BookingResponse,
     BookingTrackingResponse,
+    PackageResponse,
     PaymentUpdate,
     ScanRequest,
     StatusEvent,
@@ -76,10 +77,11 @@ def _format_cost_display(minor: int | None, currency: str) -> str | None:
 # ── Query helpers ─────────────────────────────────────────────────────────────
 
 def _with_relations(query):
-    """Eagerly load trip (with operator) and operator."""
+    """Eagerly load trip (with operator), operator, and packages."""
     return query.options(
         selectinload(Booking.trip).selectinload(Trip.operator),
         selectinload(Booking.operator),
+        selectinload(Booking.packages),
     )
 
 
@@ -102,6 +104,7 @@ async def _get_booking_or_404(
 
 def _to_booking_response(booking: Booking) -> BookingResponse:
     trip = booking.trip
+    pkgs = sorted(booking.packages, key=lambda p: p.package_number) if booking.packages else []
     return BookingResponse(
         id=booking.id,
         trip_id=booking.trip_id,
@@ -115,6 +118,7 @@ def _to_booking_response(booking: Booking) -> BookingResponse:
         recipient_city=booking.recipient_city,
         item_description=booking.item_description,
         quantity=booking.quantity,
+        package_count=booking.package_count,
         estimated_weight_kg=booking.estimated_weight_kg,
         confirmed_weight_kg=booking.confirmed_weight_kg,
         estimated_cost_display=_format_cost_display(booking.estimated_cost_minor, booking.currency),
@@ -128,11 +132,31 @@ def _to_booking_response(booking: Booking) -> BookingResponse:
         qr_label_url=booking.qr_label_url,
         last_scanned_at=booking.last_scanned_at,
         scan_count=booking.scan_count,
+        delivery_address_line1=booking.delivery_address_line1,
+        delivery_address_line2=booking.delivery_address_line2,
+        delivery_city=booking.delivery_city,
+        delivery_state=booking.delivery_state,
+        delivery_zip=booking.delivery_zip,
+        delivery_country=booking.delivery_country,
+        delivery_notes=booking.delivery_notes,
         created_at=booking.created_at,
         updated_at=booking.updated_at,
         trip_public_slug=trip.public_slug if trip else None,
         trip_departure_date=trip.departure_date if trip else None,
         trip_direction=trip.direction.value if trip else None,
+        packages=[
+            PackageResponse(
+                id=p.id,
+                package_number=p.package_number,
+                description=p.description,
+                package_reference=p.package_reference,
+                weight_kg=p.weight_kg,
+                qr_code=p.qr_code,
+                scan_status=p.scan_status.value,
+                scanned_at=p.scanned_at,
+            )
+            for p in pkgs
+        ],
     )
 
 
@@ -215,6 +239,7 @@ async def create_booking(
 
     ref = await _generate_reference_number(db)
 
+    pkg_count = max(1, body.package_count)
     booking = Booking(
         trip_id=trip.id,
         operator_id=trip.operator_id,
@@ -227,19 +252,40 @@ async def create_booking(
         recipient_city=body.recipient_city.strip(),
         item_description=body.item_description.strip(),
         quantity=body.quantity,
+        package_count=pkg_count,
         estimated_weight_kg=body.estimated_weight_kg,
         estimated_cost_minor=estimated_minor,
         currency=trip.currency,
         status=BookingStatus.confirmed,
+        collection_type=body.collection_type,
         payment_status=PaymentStatus.unpaid,
+        delivery_address_line1=body.delivery_address_line1,
+        delivery_address_line2=body.delivery_address_line2,
+        delivery_city=body.delivery_city,
+        delivery_state=body.delivery_state,
+        delivery_zip=body.delivery_zip,
+        delivery_country=body.delivery_country,
+        delivery_notes=body.delivery_notes,
     )
     db.add(booking)
+
+    # Auto-create one BookingPackage row per package
+    pkg_list: list[BookingPackage] = []
+    for i in range(pkg_count):
+        pkg = BookingPackage(
+            booking_id=booking.id,
+            package_number=i + 1,
+            package_reference=f"{ref}-P{i + 1}",
+        )
+        db.add(pkg)
+        pkg_list.append(pkg)
 
     # Upsert sender into operator's contact list
     await upsert_contact(db, trip.operator_id, body.sender_name, body.sender_phone)
 
-    await db.commit()
-    await db.refresh(booking)
+    await db.flush()
+    # Set in-memory so the route can access packages without a lazy-load
+    booking.packages = pkg_list
     return booking
 
 
@@ -297,8 +343,7 @@ async def update_payment_status(
 ) -> Booking:
     """Operator marks a booking as paid, unpaid, or refunded."""
     booking.payment_status = body.payment_status
-    await db.commit()
-    await db.refresh(booking)
+    await db.flush()
     return booking
 
 
@@ -320,8 +365,7 @@ async def update_booking_status(
     if body.collection_type is not None:
         booking.collection_type = body.collection_type
 
-    await db.commit()
-    await db.refresh(booking)
+    await db.flush()
     return booking
 
 
@@ -333,25 +377,62 @@ async def process_weigh_in(
 ) -> Booking:
     """
     Operator records the actual weight at drop-off.
-    Sets confirmed_weight_kg, recalculates cost, moves status to received.
+
+    For single-package bookings the behaviour is unchanged.
+    For multi-package bookings, body.package_id selects the specific package;
+    booking totals are recomputed from the sum of all package weights, and
+    booking.status moves to 'received' only when every package has been weighed.
     """
-    if booking.status != BookingStatus.confirmed:
-        raise validation_error(
-            f"Weigh-in is only valid for 'confirmed' bookings (current: {booking.status.value})"
-        )
-
-    # Need rate — load trip if not already loaded
     trip = booking.trip
-    confirmed_minor = _calculate_cost_minor(body.confirmed_weight_kg, trip.rate_per_kg)
 
-    booking.confirmed_weight_kg = body.confirmed_weight_kg
-    booking.confirmed_cost_minor = confirmed_minor
-    booking.status = BookingStatus.received
-    if body.payment_status is not None:
-        booking.payment_status = body.payment_status
+    if booking.packages:
+        # ── Per-package path ──────────────────────────────────────────────
+        if body.package_id is not None:
+            pkg = next((p for p in booking.packages if p.id == body.package_id), None)
+            if pkg is None:
+                raise not_found("Package")
+        elif len(booking.packages) == 1:
+            pkg = booking.packages[0]
+        else:
+            raise validation_error("package_id is required for multi-package bookings")
 
-    await db.commit()
-    await db.refresh(booking)
+        if pkg.weight_kg is not None:
+            raise validation_error(f"Package {pkg.package_reference} has already been weighed")
+
+        pkg.weight_kg   = body.confirmed_weight_kg
+        pkg.scan_status = PackageScanStatus.received
+
+        # Recompute booking totals from all package weights
+        total_kg = sum(
+            Decimal(str(p.weight_kg))
+            for p in booking.packages
+            if p.weight_kg is not None
+        )
+        booking.confirmed_weight_kg  = total_kg
+        booking.confirmed_cost_minor = _calculate_cost_minor(total_kg, trip.rate_per_kg)
+
+        if body.payment_status is not None:
+            booking.payment_status = body.payment_status
+
+        # Advance to received only when every package is weighed
+        if all(p.weight_kg is not None for p in booking.packages):
+            if booking.status == BookingStatus.confirmed:
+                booking.status = BookingStatus.received
+
+    else:
+        # ── Legacy path for bookings created before packages feature ──────
+        if booking.status != BookingStatus.confirmed:
+            raise validation_error(
+                f"Weigh-in is only valid for 'confirmed' bookings (current: {booking.status.value})"
+            )
+        confirmed_minor = _calculate_cost_minor(body.confirmed_weight_kg, trip.rate_per_kg)
+        booking.confirmed_weight_kg  = body.confirmed_weight_kg
+        booking.confirmed_cost_minor = confirmed_minor
+        booking.status               = BookingStatus.received
+        if body.payment_status is not None:
+            booking.payment_status = body.payment_status
+
+    await db.flush()
     return booking
 
 
@@ -360,20 +441,62 @@ async def process_scan(
     booking: Booking,
     body: ScanRequest,
 ) -> Booking:
-    """
-    Operator scans the QR label — increments scan_count and records timestamp.
-    """
-    await db.execute(
-        update(Booking)
-        .where(Booking.id == booking.id)
-        .values(
-            scan_count=Booking.scan_count + 1,
-            last_scanned_at=func.now(),
-        )
-    )
-    await db.commit()
-    await db.refresh(booking)
+    """Operator scans the QR label — increments scan_count and records timestamp."""
+    booking.scan_count      += 1
+    booking.last_scanned_at  = datetime.now(UTC)
+    await db.flush()
     return booking
+
+
+async def process_package_scan(
+    db: AsyncSession,
+    package_reference: str,
+    action: str,
+    operator_id: uuid.UUID,
+) -> tuple["Booking", "BookingPackage", bool]:
+    """
+    Resolve a package_reference → BookingPackage, mark its scan_status, and
+    auto-update booking.status when all packages share the same scan state.
+    Returns (booking, package, booking_fully_updated).
+    """
+    if action not in ("received", "delivered"):
+        raise validation_error("action must be 'received' or 'delivered'")
+
+    # Quick lookup to get the booking_id without loading everything
+    ref_upper = package_reference.strip().upper()
+    stub_result = await db.execute(
+        select(BookingPackage).where(BookingPackage.package_reference == ref_upper)
+    )
+    stub = stub_result.scalar_one_or_none()
+    if stub is None:
+        raise not_found("Package")
+
+    # Load the booking with full relations (validates operator ownership)
+    booking = await _get_booking_or_404(db, stub.booking_id, operator_id)
+
+    # Find the matching package inside the eagerly-loaded list so we update
+    # the same in-memory object that booking.packages holds
+    pkg = next((p for p in booking.packages if p.package_reference == ref_upper), None)
+    if pkg is None:
+        raise not_found("Package")
+
+    now = datetime.now(UTC)
+    pkg.scan_status = PackageScanStatus(action)
+    pkg.scanned_at  = now
+    booking.scan_count     += 1
+    booking.last_scanned_at = now
+
+    # Advance booking status when every package shares the new scan state
+    target = PackageScanStatus(action)
+    all_done = all(p.scan_status == target for p in booking.packages)
+    if all_done:
+        if action == "received" and booking.status == BookingStatus.confirmed:
+            booking.status = BookingStatus.received
+        elif action == "delivered":
+            booking.status = BookingStatus.delivered
+
+    await db.flush()
+    return booking, pkg, all_done
 
 
 async def get_booking_by_ref_public(

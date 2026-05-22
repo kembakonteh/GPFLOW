@@ -54,6 +54,15 @@ class Operator(Base):
     country: Mapped[str] = mapped_column(String(100), nullable=False)
     city:    Mapped[str] = mapped_column(String(100), nullable=False)
 
+    # Mailing address — where out-of-area customers can mail packages to the operator
+    mailing_address_line1: Mapped[str | None] = mapped_column(String(255))
+    mailing_address_line2: Mapped[str | None] = mapped_column(String(255))
+    mailing_city:          Mapped[str | None] = mapped_column(String(100))
+    mailing_state:         Mapped[str | None] = mapped_column(String(100))
+    mailing_zip:           Mapped[str | None] = mapped_column(String(20))
+    mailing_country:       Mapped[str | None] = mapped_column(String(2), server_default="US")
+    mailing_instructions:  Mapped[str | None] = mapped_column(String(1000))
+
     # Preferences & tier
     weight_unit: Mapped[WeightUnit] = mapped_column(
         SAEnum(WeightUnit, name="weight_unit", values_callable=lambda e: [m.value for m in e]),

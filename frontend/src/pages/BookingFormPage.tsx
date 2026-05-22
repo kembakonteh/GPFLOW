@@ -49,9 +49,31 @@ export default function BookingFormPage() {
   const [recipientName, setRecipientName] = useState("");
   const [recipientCity, setRecipientCity] = useState("");
   const [itemDesc,      setItemDesc]      = useState("");
-  const [quantity,      setQuantity]      = useState(1);
+  const [packageCount,  setPackageCount]  = useState(1);
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState("");
+  // Delivery address — for inbound trips
+  const [deliveryLine1, setDeliveryLine1] = useState("");
+  const [deliveryLine2, setDeliveryLine2] = useState("");
+  const [deliveryCity,  setDeliveryCity]  = useState("");
+  const [deliveryState, setDeliveryState] = useState("");
+  const [deliveryZip,   setDeliveryZip]   = useState("");
+  const [deliveryNotes, setDeliveryNotes] = useState("");
+
+  // "Inbound" = packages arriving at the operator's home country (US/UK).
+  // Three independent signals — any one being true is sufficient:
+  //   1. direction field set correctly
+  //   2. destination_country is US or GB (most reliable for GPFLOW trips)
+  //   3. origin_country is neither US nor GB (fallback if origin was set correctly)
+  const isInbound = trip != null && (
+    trip.direction === "inbound" ||
+    trip.destination_country?.toUpperCase() === "US" ||
+    trip.destination_country?.toUpperCase() === "GB"
+  );
+
+  // wantsDelivery: null = user hasn't touched the toggle → fall back to isInbound default
+  const [wantsDelivery, setWantsDelivery] = useState<boolean | null>(null);
+  const showDelivery = wantsDelivery !== null ? wantsDelivery : isInbound;
 
   const allFilled = senderName && senderPhone && recipientName && recipientCity && itemDesc;
 
@@ -64,16 +86,28 @@ export default function BookingFormPage() {
     setLoading(true);
     setError("");
     try {
-      const { data } = await api.post<BookingPublicResponse>("/bookings", {
+      const body: Record<string, unknown> = {
         trip_id:             trip.id,
         sender_name:         senderName,
         sender_phone:        senderPhone,
         recipient_name:      recipientName,
         recipient_city:      recipientCity,
         item_description:    itemDesc,
-        quantity,
+        quantity:            1,
+        package_count:       packageCount,
         estimated_weight_kg: 0,
-      });
+        collection_type:     showDelivery ? "operator_delivers" : "self_collect",
+      };
+      if (showDelivery && deliveryLine1) {
+        body.delivery_address_line1 = deliveryLine1;
+        body.delivery_address_line2 = deliveryLine2 || undefined;
+        body.delivery_city          = deliveryCity  || undefined;
+        body.delivery_state         = deliveryState || undefined;
+        body.delivery_zip           = deliveryZip   || undefined;
+        body.delivery_country       = "US";
+        body.delivery_notes         = deliveryNotes || undefined;
+      }
+      const { data } = await api.post<BookingPublicResponse>("/bookings", body);
       navigate(`/booking/${data.reference_number}/confirmed`, { state: { booking: data, trip } });
     } catch (e: unknown) {
       const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -96,7 +130,7 @@ export default function BookingFormPage() {
             display: "flex", justifyContent: "space-between", alignItems: "center",
           }}>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>🇺🇸→🇬🇲 {origin} → {dest}</div>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>{origin} → {dest}</div>
               <div style={{ fontSize: 11, color: C.textSub, marginTop: 2 }}>{trip.operator_business_name} · Cutoff {cutoffFmt}</div>
             </div>
             <div style={{ textAlign: "right" }}>
@@ -141,6 +175,89 @@ export default function BookingFormPage() {
           </div>
         </div>
 
+        {/* Collection type toggle — always visible once trip is loaded */}
+        {trip && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 10 }}>How would you like to receive it?</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setWantsDelivery(false)}
+                style={{
+                  background: !showDelivery ? C.tealDim : C.card2,
+                  border: `1.5px solid ${!showDelivery ? C.teal : C.border}`,
+                  borderRadius: 12, padding: "14px 10px",
+                  color: !showDelivery ? C.teal : C.textSub,
+                  fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  fontFamily: "'DM Sans',sans-serif",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                  transition: "all 0.15s",
+                }}
+              >
+                <span style={{ fontSize: 22 }}>🤝</span>
+                <span>Self-collect</span>
+                <span style={{ fontSize: 10, opacity: 0.8, fontWeight: 400 }}>I'll pick it up</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setWantsDelivery(true)}
+                style={{
+                  background: showDelivery ? C.accentDim : C.card2,
+                  border: `1.5px solid ${showDelivery ? C.accent : C.border}`,
+                  borderRadius: 12, padding: "14px 10px",
+                  color: showDelivery ? C.accent : C.textSub,
+                  fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  fontFamily: "'DM Sans',sans-serif",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                  transition: "all 0.15s",
+                }}
+              >
+                <span style={{ fontSize: 22 }}>🚚</span>
+                <span>Deliver to me</span>
+                <span style={{ fontSize: 10, opacity: 0.8, fontWeight: 400 }}>Operator drops it off</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Delivery address — shown when "Deliver to me" is selected */}
+        {showDelivery && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>🚚 Delivery Address</div>
+            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 14, lineHeight: 1.6 }}>
+              Optional — you can confirm this with {trip?.operator_business_name} later.
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={lbl}>Street address</label>
+                <input value={deliveryLine1} onChange={(e) => setDeliveryLine1(e.target.value)} placeholder="123 Main St" style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Apt / Suite (optional)</label>
+                <input value={deliveryLine2} onChange={(e) => setDeliveryLine2(e.target.value)} placeholder="Apt 4B" style={inp} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: 10 }}>
+                <div>
+                  <label style={lbl}>City</label>
+                  <input value={deliveryCity} onChange={(e) => setDeliveryCity(e.target.value)} placeholder="Seattle" style={inp} />
+                </div>
+                <div>
+                  <label style={lbl}>State</label>
+                  <input value={deliveryState} onChange={(e) => setDeliveryState(e.target.value)} placeholder="WA" style={inp} />
+                </div>
+                <div>
+                  <label style={lbl}>ZIP</label>
+                  <input value={deliveryZip} onChange={(e) => setDeliveryZip(e.target.value)} placeholder="98101" style={inp} />
+                </div>
+              </div>
+              <div>
+                <label style={lbl}>Delivery notes (optional)</label>
+                <input value={deliveryNotes} onChange={(e) => setDeliveryNotes(e.target.value)} placeholder="Gate code, call on arrival, etc." style={inp} />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* What are you sending */}
         <div style={{ marginBottom: 28 }}>
           <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 6 }}>What are you sending?</div>
@@ -155,12 +272,15 @@ export default function BookingFormPage() {
             style={{ ...inp, resize: "none", lineHeight: 1.6 }}
           />
 
-          {/* Quantity picker */}
+          {/* Package count picker */}
           <div style={{ marginTop: 16 }}>
             <label style={lbl}>Number of packages</label>
-            <div style={{ display: "flex", alignItems: "center", gap: 0, marginTop: 6 }}>
+            <div style={{ fontSize: 11, color: C.textSub, marginBottom: 8 }}>
+              Each package gets its own QR label and tracking code
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
               <button
-                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                onClick={() => setPackageCount((q) => Math.max(1, q - 1))}
                 style={{
                   width: 48, height: 48, borderRadius: "10px 0 0 10px",
                   background: "#0A0E1A", border: `1px solid ${C.border}`,
@@ -174,10 +294,10 @@ export default function BookingFormPage() {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 20, fontWeight: 800, color: C.text,
               }}>
-                {quantity}
+                {packageCount}
               </div>
               <button
-                onClick={() => setQuantity((q) => Math.min(20, q + 1))}
+                onClick={() => setPackageCount((q) => Math.min(20, q + 1))}
                 style={{
                   width: 48, height: 48, borderRadius: "0 10px 10px 0",
                   background: "#0A0E1A", border: `1px solid ${C.border}`,
@@ -186,7 +306,7 @@ export default function BookingFormPage() {
                 }}
               >+</button>
             </div>
-            {quantity > 1 && (
+            {packageCount > 1 && (
               <div style={{ fontSize: 11, color: C.textSub, marginTop: 6 }}>
                 Each package will be weighed and charged separately at drop-off.
               </div>

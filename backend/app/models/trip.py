@@ -88,10 +88,11 @@ class Trip(Base):
     view_count:  Mapped[int]  = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     # Pickup info — populated when operator marks trip as arrived
-    pickup_location: Mapped[str | None] = mapped_column(String(255))
-    pickup_window:   Mapped[str | None] = mapped_column(String(100))
-    pickup_notes:    Mapped[str | None] = mapped_column(Text)
-    arrived_at:      Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    pickup_location:     Mapped[str | None]      = mapped_column(String(255))
+    pickup_window:       Mapped[str | None]      = mapped_column(String(100))
+    pickup_notes:        Mapped[str | None]      = mapped_column(Text)
+    arrived_at:          Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    arrival_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -102,12 +103,43 @@ class Trip(Base):
     )
 
     # ── Relationships ──────────────────────────────────────────────────────
-    operator: Mapped["Operator"]        = relationship("Operator",   back_populates="trips")
-    bookings: Mapped[list["Booking"]]   = relationship("Booking",    back_populates="trip")
-    updates:  Mapped[list["TripUpdate"]]= relationship("TripUpdate", back_populates="trip")
+    operator:          Mapped["Operator"]               = relationship("Operator",            back_populates="trips")
+    bookings:          Mapped[list["Booking"]]          = relationship("Booking",             back_populates="trip")
+    updates:           Mapped[list["TripUpdate"]]       = relationship("TripUpdate",          back_populates="trip")
+    drop_off_locations: Mapped[list["TripDropoffLocation"]] = relationship(
+        "TripDropoffLocation",
+        back_populates="trip",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return (
             f"<Trip id={self.id} slug={self.public_slug!r} "
             f"status={self.status.value} direction={self.direction.value}>"
         )
+
+
+# ── Drop-off location ─────────────────────────────────────────────────────────
+
+class TripDropoffLocation(Base):
+    __tablename__ = "trip_dropoff_locations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    trip_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("trips.id", ondelete="CASCADE"), nullable=False
+    )
+    label:         Mapped[str]      = mapped_column(String(200), nullable=False)
+    address:       Mapped[str | None] = mapped_column(String(500))
+    city:          Mapped[str | None] = mapped_column(String(100))
+    state:         Mapped[str | None] = mapped_column(String(100))
+    display_order: Mapped[int]      = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    created_at:    Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    trip: Mapped["Trip"] = relationship("Trip", back_populates="drop_off_locations")
+
+    def __repr__(self) -> str:
+        return f"<TripDropoffLocation trip_id={self.trip_id} label={self.label!r}>"

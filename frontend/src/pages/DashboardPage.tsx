@@ -12,7 +12,7 @@ import DepartedModal from "../components/modals/DepartedModal";
 import CutoffModal from "../components/modals/CutoffModal";
 import ArrivedModal from "../components/modals/ArrivedModal";
 import ScanModal from "../components/modals/ScanModal";
-import type { Booking, Operator, Trip } from "../types";
+import type { Booking, Operator, Trip, TripAnnouncement } from "../types";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type UIStage =
@@ -69,6 +69,8 @@ export default function DashboardPage() {
   const [cutoffSent, setCutoffSent] = useState(0);
   const [linkCopied, setLinkCopied] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [showAnnouncement, setShowAnnouncement] = useState(false);
+  const [annCopied, setAnnCopied] = useState(false);
 
   // ── Data ──────────────────────────────────────────────────────────────
   const { data: operator } = useQuery<Operator>({
@@ -87,6 +89,13 @@ export default function DashboardPage() {
     queryKey: ["bookings", trip?.id],
     queryFn:  () => api.get(`/bookings?trip_id=${trip!.id}&limit=200`).then((r) => r.data),
     enabled:  !!trip?.id,
+  });
+
+  const { data: announcement } = useQuery<TripAnnouncement>({
+    queryKey: ["announcement", trip?.id],
+    queryFn:  () => api.get(`/trips/${trip!.id}/announcement`).then((r) => r.data),
+    enabled:  showAnnouncement && !!trip?.id,
+    staleTime: 5 * 60 * 1000,
   });
 
   const stage      = deriveStage(trip, bookings);
@@ -248,6 +257,17 @@ export default function DashboardPage() {
               {trip?.pickup_location && (
                 <div style={{ fontSize: 13, color: C.textSub, marginTop: 4 }}>
                   📍 {trip.pickup_location}{trip.pickup_window ? ` · 📅 ${trip.pickup_window}` : ""}
+                </div>
+              )}
+              {trip?.arrival_notified_at && (
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                  marginTop: 8, background: C.accentDim,
+                  border: `1px solid ${C.accentBorder}`,
+                  borderRadius: 8, padding: "4px 10px",
+                  fontSize: 11, fontWeight: 700, color: C.accent,
+                }}>
+                  ✓ Customers Notified
                 </div>
               )}
             </>}
@@ -436,6 +456,97 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {/* ── Drop-off Locations ── */}
+        {trip && trip.drop_off_locations && trip.drop_off_locations.length > 0 && (
+          <div style={{
+            background: C.card, border: `1px solid ${C.border}`,
+            borderRadius: 16, padding: "16px 18px", marginBottom: 16,
+          }}>
+            <div style={{ fontSize: 11, color: C.textSub, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>
+              📍 Drop-off Locations
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {trip.drop_off_locations.map((loc) => (
+                <div key={loc.id} style={{ fontSize: 13 }}>
+                  <span style={{ fontWeight: 700 }}>• {loc.label}</span>
+                  {loc.address && <span style={{ color: C.textSub, fontSize: 12 }}> — {loc.address}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Share Trip Announcement ── */}
+        {(stage === "announced" || stage === "dropoff") && trip && (
+          <div style={{ marginBottom: 16 }}>
+            <button
+              onClick={() => setShowAnnouncement((v) => !v)}
+              style={{
+                width: "100%", background: C.card,
+                border: `1px solid ${C.border}`, borderRadius: 14,
+                padding: "13px 16px", cursor: "pointer",
+                fontFamily: "'DM Sans',sans-serif",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>📢 Share Trip Announcement</span>
+              <span style={{ fontSize: 12, color: C.textSub }}>{showAnnouncement ? "▲" : "▼"}</span>
+            </button>
+
+            {showAnnouncement && (
+              <div style={{
+                background: C.card, border: `1px solid ${C.border}`,
+                borderTop: "none", borderRadius: "0 0 14px 14px",
+                padding: "14px 16px",
+              }}>
+                {announcement ? (
+                  <>
+                    <textarea
+                      readOnly
+                      value={announcement.whatsapp_message}
+                      style={{
+                        width: "100%", background: C.card2,
+                        border: `1px solid ${C.border}`, borderRadius: 10,
+                        padding: "12px 14px", color: C.text, fontSize: 12,
+                        fontFamily: "monospace", lineHeight: 1.7,
+                        resize: "none", outline: "none", boxSizing: "border-box",
+                        minHeight: 180,
+                      }}
+                      rows={10}
+                    />
+                    <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center" }}>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(announcement.whatsapp_message);
+                          setAnnCopied(true);
+                          setTimeout(() => setAnnCopied(false), 2000);
+                        }}
+                        style={{
+                          background: annCopied ? C.accent : C.accentDim,
+                          border: `1px solid ${C.accentBorder}`,
+                          borderRadius: 8, padding: "8px 16px",
+                          color: annCopied ? "#07090F" : C.accent,
+                          fontSize: 12, fontWeight: 700, cursor: "pointer",
+                          fontFamily: "'DM Sans',sans-serif", flexShrink: 0,
+                        }}
+                      >
+                        {annCopied ? "Copied ✓" : "📋 Copy Message"}
+                      </button>
+                      <span style={{ fontSize: 11, color: C.textDim }}>
+                        Paste to WhatsApp Status or broadcast list
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 12, color: C.textSub, padding: "8px 0" }}>
+                    Loading announcement…
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Empty state ── */}
         {stage === "announced" && total === 0 && (
           <div style={{
@@ -459,8 +570,12 @@ export default function DashboardPage() {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {bookings.map((b) => {
-                const isWeighed = b.confirmed_weight_kg != null;
-                const lbs = isWeighed ? (Number(b.confirmed_weight_kg) * KG_TO_LB).toFixed(1) : null;
+                const isWeighed = b.packages.length > 0
+                  ? b.packages.every((p) => p.weight_kg != null)
+                  : b.confirmed_weight_kg != null;
+                const lbs = b.confirmed_weight_kg != null
+                  ? (Number(b.confirmed_weight_kg) * KG_TO_LB).toFixed(1)
+                  : null;
                 return (
                   <div key={b.id} style={{
                     background: C.card2, border: `1px solid ${C.border}`,
@@ -496,7 +611,9 @@ export default function DashboardPage() {
                       {isWeighed && (
                         <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: C.accent }}>{b.confirmed_cost_display ?? ""}</div>
-                          <div style={{ fontSize: 11, color: C.textSub }}>{lbs}lbs</div>
+                          <div style={{ fontSize: 11, color: C.textSub }}>
+                            {lbs}lbs{b.package_count > 1 ? ` · ${b.package_count} packages` : ""}
+                          </div>
                           <button
                             onClick={(e) => { e.stopPropagation(); togglePayment(b); }}
                             style={{
@@ -548,6 +665,16 @@ export default function DashboardPage() {
                           <div style={{ fontSize: 14, fontWeight: 700 }}>{b.recipient_name}</div>
                           <div style={{ fontSize: 11, color: C.textSub }}>{b.recipient_city} · from {b.sender_name}</div>
                           <code style={{ fontSize: 10, color: C.teal, fontFamily: "monospace" }}>{b.reference_number}</code>
+                          {b.delivery_address_line1 && (
+                            <div style={{
+                              display: "inline-flex", alignItems: "center", gap: 4,
+                              background: "#0D1B2A", border: `1px solid ${C.border}`,
+                              borderRadius: 6, padding: "2px 7px", marginTop: 4,
+                              fontSize: 10, fontWeight: 700, color: C.textSub,
+                            }}>
+                              🚚 Delivery · {b.delivery_city || b.delivery_address_line1}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

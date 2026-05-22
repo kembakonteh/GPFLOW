@@ -361,6 +361,20 @@ def _maybe_retry(ctx: dict, exc: Exception) -> None:
     log.error("[ARQ] Giving up after %d attempts", attempt)
 
 
+# ── Redis settings helper ─────────────────────────────────────────────────────
+
+def _build_redis_settings() -> RedisSettings:
+    from app.core.config import settings as app_settings
+
+    parsed = urlparse(app_settings.REDIS_URL)
+    return RedisSettings(
+        host=parsed.hostname or "localhost",
+        port=parsed.port or 6379,
+        password=parsed.password,
+        database=int(parsed.path.lstrip("/") or 0),
+    )
+
+
 # ── Worker settings (main worker) ─────────────────────────────────────────────
 
 class WorkerSettings:
@@ -383,17 +397,7 @@ class WorkerSettings:
         send_first_booking_alert_task,
     ]
 
-    @property
-    def redis_settings(self) -> RedisSettings:
-        from app.core.config import settings as app_settings
-
-        parsed = urlparse(app_settings.REDIS_URL)
-        return RedisSettings(
-            host=parsed.hostname or "localhost",
-            port=parsed.port or 6379,
-            password=parsed.password,
-            database=int(parsed.path.lstrip("/") or 0),
-        )
+    redis_settings = _build_redis_settings()
 
     max_jobs    = 10
     job_timeout = 300           # 5 minutes per job (label gen + bulk fan-outs)

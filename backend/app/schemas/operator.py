@@ -61,6 +61,15 @@ class OperatorResponse(BaseModel):
     created_at:           datetime
     # password_hash intentionally excluded
 
+    # Mailing address
+    mailing_address_line1: str | None = None
+    mailing_address_line2: str | None = None
+    mailing_city:          str | None = None
+    mailing_state:         str | None = None
+    mailing_zip:           str | None = None
+    mailing_country:       str | None = None
+    mailing_instructions:  str | None = None
+
 
 class TokenResponse(BaseModel):
     """Returned by the /refresh endpoint — access token only."""
@@ -86,6 +95,15 @@ class OperatorUpdate(BaseModel):
     country:       str | None       = Field(None, min_length=2, max_length=2)
     logo_url:      str | None       = None
     weight_unit:   WeightUnit | None = None
+
+    # Mailing address
+    mailing_address_line1: str | None = Field(None, max_length=255)
+    mailing_address_line2: str | None = Field(None, max_length=255)
+    mailing_city:          str | None = Field(None, max_length=100)
+    mailing_state:         str | None = Field(None, max_length=100)
+    mailing_zip:           str | None = Field(None, max_length=20)
+    mailing_country:       str | None = Field(None, min_length=2, max_length=2)
+    mailing_instructions:  str | None = Field(None, max_length=1000)
 
 
 # ── Stats schema ──────────────────────────────────────────────────────────────

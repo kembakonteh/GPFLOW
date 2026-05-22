@@ -3,6 +3,7 @@ import ProtectedRoute       from './components/layout/ProtectedRoute';
 import LoginPage            from './pages/LoginPage';
 import RegisterPage         from './pages/RegisterPage';
 import DashboardPage        from './pages/DashboardPage';
+import SettingsPage         from './pages/SettingsPage';
 import PublicTripPage       from './pages/PublicTripPage';
 import BookingFormPage      from './pages/BookingFormPage';
 import BookingConfirmedPage from './pages/BookingConfirmedPage';
@@ -18,6 +19,7 @@ export default function App() {
 
         {/* ── Operator dashboard (protected) ──────────────────────────────── */}
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/settings"  element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
 
         {/* ── Public customer pages (no auth) ─────────────────────────────── */}
         <Route path="/trip/:slug"      element={<PublicTripPage />} />

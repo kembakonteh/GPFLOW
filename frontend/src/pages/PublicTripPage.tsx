@@ -146,6 +146,63 @@ export default function PublicTripPage() {
             </div>
           )}
 
+          {/* Drop-off locations */}
+          {trip.drop_off_locations && trip.drop_off_locations.length > 0 && (
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 11, color: C.textSub, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
+                📍 Drop-off Locations
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {trip.drop_off_locations.map((loc) => (
+                  <div key={loc.id} style={{
+                    background: C.card2, border: `1px solid ${C.border}`,
+                    borderRadius: 10, padding: "11px 14px",
+                    display: "flex", alignItems: "flex-start", gap: 10,
+                  }}>
+                    <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>📍</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>{loc.label}</div>
+                      {loc.address && (
+                        <div style={{ fontSize: 11, color: C.textSub, marginTop: 2 }}>{loc.address}</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Mailing address — only shown when operator has set it */}
+          {trip.operator_mailing_address_line1 && trip.operator_mailing_city && (
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 11, color: C.textSub, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
+                📬 Mail Your Packages To Us
+              </div>
+              <div style={{
+                background: C.card2, border: `1px solid ${C.accentBorder}`,
+                borderRadius: 12, padding: "14px 16px",
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{trip.operator_business_name}</div>
+                <div style={{ fontSize: 13, color: C.text, lineHeight: 1.7 }}>
+                  {trip.operator_mailing_address_line1}<br />
+                  {trip.operator_mailing_address_line2 && <>{trip.operator_mailing_address_line2}<br /></>}
+                  {trip.operator_mailing_city}, {trip.operator_mailing_state} {trip.operator_mailing_zip}
+                  {trip.operator_mailing_country && trip.operator_mailing_country !== "US" && ` · ${trip.operator_mailing_country}`}
+                </div>
+                {trip.operator_mailing_instructions && (
+                  <div style={{
+                    marginTop: 10,
+                    background: C.goldDim, border: `1px solid ${C.goldBorder}`,
+                    borderRadius: 8, padding: "10px 12px",
+                    fontSize: 12, color: C.gold, lineHeight: 1.6,
+                  }}>
+                    ⚠️ {trip.operator_mailing_instructions}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* CTA */}
           <button
             onClick={() => navigate(`/trip/${slug}/book`)}

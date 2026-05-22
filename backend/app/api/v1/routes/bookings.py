@@ -30,6 +30,10 @@ from app.schemas.booking import (
     BookingPublicResponse,
     BookingResponse,
     BookingTrackingResponse,
+    PackagePublicResponse,
+    PackageScanRequest,
+    PackageScanResponse,
+    PackageResponse,
     PaymentUpdate,
     ScanRequest,
     StatusUpdate,
@@ -42,6 +46,7 @@ from app.services.booking_service import (
     get_bookings,
     get_booking_by_ref,
     get_booking_by_ref_public,
+    process_package_scan,
     process_scan,
     process_weigh_in,
     update_booking_status,
@@ -114,6 +119,22 @@ async def create(
         recipient_city=booking.recipient_city,
         item_description=booking.item_description,
         estimated_weight_kg=booking.estimated_weight_kg,
+        package_count=booking.package_count,
+        packages=[
+            PackagePublicResponse(
+                package_number=p.package_number,
+                package_reference=p.package_reference,
+                description=p.description,
+            )
+            for p in sorted(booking.packages, key=lambda p: p.package_number)
+        ],
+        delivery_address_line1=booking.delivery_address_line1,
+        delivery_address_line2=booking.delivery_address_line2,
+        delivery_city=booking.delivery_city,
+        delivery_state=booking.delivery_state,
+        delivery_zip=booking.delivery_zip,
+        delivery_country=booking.delivery_country,
+        delivery_notes=booking.delivery_notes,
     )
 
 
@@ -227,16 +248,46 @@ async def weigh_in(
     booking = await get_booking(db, booking_id, operator.id)
     booking = await process_weigh_in(db, booking, body, operator)
 
-    # Notify sender that their item has been received and weighed
-    try:
-        await redis.enqueue_job(
-            "send_item_received_task",
-            booking_id=str(booking.id),
-        )
-    except Exception:
-        pass
+    # Send WhatsApp notification only when the booking is fully received
+    # (for multi-package bookings this fires once — after the last package)
+    if booking.status.value == "received":
+        try:
+            await redis.enqueue_job(
+                "send_item_received_task",
+                booking_id=str(booking.id),
+            )
+        except Exception:
+            pass
 
     return _to_booking_response(booking)
+
+
+# ── POST /bookings/packages/scan — must be before /{booking_id}/scan ──────────
+
+@router.post("/packages/scan", response_model=PackageScanResponse)
+async def scan_package(
+    body:     PackageScanRequest,
+    operator: Operator   = Depends(get_current_operator),
+    db: AsyncSession     = Depends(get_db),
+):
+    """Resolve a package_reference to a package, mark scan_status, auto-update booking."""
+    booking, pkg, all_done = await process_package_scan(
+        db, body.package_reference, body.action, operator.id
+    )
+    return PackageScanResponse(
+        booking=_to_booking_response(booking),
+        package=PackageResponse(
+            id=pkg.id,
+            package_number=pkg.package_number,
+            description=pkg.description,
+            package_reference=pkg.package_reference,
+            weight_kg=pkg.weight_kg,
+            qr_code=pkg.qr_code,
+            scan_status=pkg.scan_status.value,
+            scanned_at=pkg.scanned_at,
+        ),
+        booking_fully_updated=all_done,
+    )
 
 
 # ── POST /bookings/{id}/scan ──────────────────────────────────────────────────

@@ -32,6 +32,18 @@ from app.workers.tasks import (
 )
 
 
+def _build_redis_settings() -> RedisSettings:
+    from app.core.config import settings as app_settings
+
+    parsed = urlparse(app_settings.REDIS_URL)
+    return RedisSettings(
+        host=parsed.hostname or "localhost",
+        port=parsed.port or 6379,
+        password=parsed.password,
+        database=int(parsed.path.lstrip("/") or 0),
+    )
+
+
 class WorkerSettings:
     """
     Notification-only ARQ worker.
@@ -49,17 +61,7 @@ class WorkerSettings:
         send_first_booking_alert_task,
     ]
 
-    @property
-    def redis_settings(self) -> RedisSettings:
-        from app.core.config import settings as app_settings
-
-        parsed = urlparse(app_settings.REDIS_URL)
-        return RedisSettings(
-            host=parsed.hostname or "localhost",
-            port=parsed.port or 6379,
-            password=parsed.password,
-            database=int(parsed.path.lstrip("/") or 0),
-        )
+    redis_settings = _build_redis_settings()
 
     max_jobs    = 20
     job_timeout = 30       # notifications should complete in < 10 s

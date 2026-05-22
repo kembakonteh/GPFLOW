@@ -29,8 +29,12 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
   const [waCity, setWaCity] = useState("");
   const [waItems, setWaItems] = useState("");
 
-  const weighed = bookings.filter((b) => b.confirmed_weight_kg != null);
-  const pending = bookings.filter((b) => b.confirmed_weight_kg == null);
+  const isFullyWeighed = (b: Booking) => {
+    if (b.packages && b.packages.length > 0) return b.packages.every((p) => p.weight_kg != null);
+    return b.confirmed_weight_kg != null;
+  };
+  const weighed = bookings.filter(isFullyWeighed);
+  const pending = bookings.filter((b) => !isFullyWeighed(b));
 
   const q = search.toLowerCase().trim();
   const filtered = q
@@ -173,56 +177,100 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
                   </button>
                 </div>
               )}
-              {filtered.map((b) => (
-                <div
-                  key={b.id}
-                  style={{
-                    background: C.card2, border: `1px solid ${C.border}`,
-                    borderRadius: 14, padding: "14px 16px",
-                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
-                    <div style={{
-                      width: 38, height: 38, borderRadius: "50%",
-                      background: `linear-gradient(135deg,${C.gold},#D97706)`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 16, fontWeight: 900, color: "#07090F", flexShrink: 0,
-                    }}>
-                      {b.sender_name.charAt(0)}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <span style={{ fontSize: 14, fontWeight: 700 }}>{b.sender_name}</span>
-                        {(b as any).is_walk_in && (
-                          <span style={{
-                            background: C.goldDim, border: `1px solid ${C.goldBorder}`,
-                            borderRadius: 6, padding: "1px 7px",
-                            fontSize: 9, fontWeight: 800, color: C.gold,
-                          }}>WALK-IN</span>
-                        )}
+              {filtered.map((b) => {
+                const isMulti = b.packages && b.packages.length > 1;
+                return (
+                  <div key={b.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                    <div
+                      style={{
+                        background: C.card2, border: `1px solid ${C.border}`,
+                        borderRadius: isMulti ? "14px 14px 0 0" : 14, padding: "14px 16px",
+                        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
+                        <div style={{
+                          width: 38, height: 38, borderRadius: "50%",
+                          background: `linear-gradient(135deg,${C.gold},#D97706)`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 16, fontWeight: 900, color: "#07090F", flexShrink: 0,
+                        }}>
+                          {b.sender_name.charAt(0)}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 14, fontWeight: 700 }}>{b.sender_name}</span>
+                            {(b as any).is_walk_in && (
+                              <span style={{
+                                background: C.goldDim, border: `1px solid ${C.goldBorder}`,
+                                borderRadius: 6, padding: "1px 7px",
+                                fontSize: 9, fontWeight: 800, color: C.gold,
+                              }}>WALK-IN</span>
+                            )}
+                            {isMulti && (
+                              <span style={{
+                                background: C.blueDim, border: `1px solid ${C.blueBorder}`,
+                                borderRadius: 6, padding: "1px 7px",
+                                fontSize: 9, fontWeight: 800, color: C.blue,
+                              }}>{b.package_count} PKG</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 11, color: C.textSub, marginTop: 2 }}>
+                            {b.item_description} → {b.recipient_name}
+                          </div>
+                          <code style={{ fontSize: 10, color: C.teal, fontFamily: "monospace", fontWeight: 700 }}>
+                            {b.reference_number}
+                          </code>
+                        </div>
                       </div>
-                      <div style={{ fontSize: 11, color: C.textSub, marginTop: 2 }}>
-                        {b.item_description} → {b.recipient_name}
-                      </div>
-                      <code style={{ fontSize: 10, color: C.teal, fontFamily: "monospace", fontWeight: 700 }}>
-                        {b.reference_number}
-                      </code>
+                      <button
+                        onClick={() => setWeighing(b)}
+                        style={{
+                          background: C.gold, border: "none", borderRadius: 10,
+                          padding: "8px 14px", color: "#07090F",
+                          fontSize: 12, fontWeight: 800, cursor: "pointer",
+                          fontFamily: "'DM Sans',sans-serif", flexShrink: 0,
+                        }}
+                      >
+                        ⚖️ Weigh
+                      </button>
                     </div>
+
+                    {/* Package sub-rows for multi-package bookings */}
+                    {isMulti && b.packages.map((pkg, pi) => {
+                      const pkgLbs = pkg.weight_kg != null ? (Number(pkg.weight_kg) * 2.20462).toFixed(1) : null;
+                      const isLast = pi === b.packages.length - 1;
+                      return (
+                        <div
+                          key={pkg.id}
+                          style={{
+                            background: pkg.weight_kg != null ? C.accentDim : "#0A0E1A",
+                            border: `1px solid ${pkg.weight_kg != null ? C.accentBorder : C.border}`,
+                            borderTop: "none",
+                            borderRadius: isLast ? "0 0 14px 14px" : 0,
+                            padding: "8px 16px",
+                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                          }}
+                        >
+                          <div>
+                            <code style={{ fontSize: 10, color: C.teal, fontFamily: "monospace", fontWeight: 700 }}>
+                              {pkg.package_reference}
+                            </code>
+                            {pkg.description && (
+                              <span style={{ fontSize: 10, color: C.textSub, marginLeft: 6 }}>
+                                {pkg.description}
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: pkg.weight_kg != null ? C.accent : C.textDim }}>
+                            {pkgLbs != null ? `✓ ${pkgLbs} lbs` : "pending"}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <button
-                    onClick={() => setWeighing(b)}
-                    style={{
-                      background: C.gold, border: "none", borderRadius: 10,
-                      padding: "8px 14px", color: "#07090F",
-                      fontSize: 12, fontWeight: 800, cursor: "pointer",
-                      fontFamily: "'DM Sans',sans-serif", flexShrink: 0,
-                    }}
-                  >
-                    ⚖️ Weigh
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Weighed (dimmed) */}

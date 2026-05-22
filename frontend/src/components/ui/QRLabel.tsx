@@ -1,18 +1,25 @@
-import type { Booking, Trip } from "../../types";
+import type { Booking, BookingPackage, Trip } from "../../types";
 
 interface Props {
   booking: Booking;
   trip: Trip;
+  pkg?: BookingPackage;  // when set, label shows per-package info
 }
 
-export default function QRLabel({ booking, trip }: Props) {
+export default function QRLabel({ booking, trip, pkg }: Props) {
   const origin = `${trip.origin_city}, ${trip.origin_country}`;
   const dest   = `${trip.destination_city}, ${trip.destination_country}`;
-  const confKg  = booking.confirmed_weight_kg != null ? Number(booking.confirmed_weight_kg) : null;
+
+  // Weight and cost: per-package if pkg supplied, otherwise booking-level
+  const rawKg   = pkg ? pkg.weight_kg : booking.confirmed_weight_kg;
+  const confKg  = rawKg != null ? Number(rawKg) : null;
   const confLbs = confKg != null ? (confKg * 2.20462).toFixed(1) : null;
   const weightLabel = confLbs != null ? `${confLbs}lbs (${confKg!.toFixed(2)}kg)` : null;
-  const costLabel   = booking.confirmed_cost_display ?? null;
-  const trackUrl    = `gpflow.app/track/${booking.reference_number}`;
+  const costLabel   = pkg ? null : (booking.confirmed_cost_display ?? null);
+
+  // Reference: package ref if per-package, else booking ref
+  const displayRef = pkg ? pkg.package_reference : booking.reference_number;
+  const trackUrl   = `gpflow.app/track/${booking.reference_number}`;
 
   return (
     <div style={{
@@ -28,13 +35,24 @@ export default function QRLabel({ booking, trip }: Props) {
         <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>{trip.operator_business_name}</div>
         <div style={{ fontSize: 10, color: "#555", marginTop: 1 }}>{origin} → {dest}</div>
         <div style={{ fontSize: 10, color: "#555" }}>Departs {trip.departure_date}</div>
+        {pkg && (
+          <div style={{
+            marginTop: 6, background: "#000", color: "#fff", borderRadius: 4,
+            padding: "2px 8px", display: "inline-block", fontSize: 9, fontWeight: 800, letterSpacing: "0.08em",
+          }}>
+            PACKAGE {pkg.package_number} OF {booking.package_count}
+            {pkg.description ? ` — ${pkg.description.toUpperCase()}` : ""}
+          </div>
+        )}
       </div>
 
       {/* Reference */}
       <div style={{ textAlign: "center", background: "#000", borderRadius: 6, padding: "10px" }}>
-        <div style={{ fontSize: 10, color: "#aaa", letterSpacing: "0.12em", marginBottom: 3 }}>TRACKING REFERENCE</div>
-        <div style={{ fontFamily: "monospace", fontSize: 22, fontWeight: 900, color: "#fff", letterSpacing: "0.1em" }}>
-          {booking.reference_number}
+        <div style={{ fontSize: 10, color: "#aaa", letterSpacing: "0.12em", marginBottom: 3 }}>
+          {pkg ? "PACKAGE REFERENCE" : "TRACKING REFERENCE"}
+        </div>
+        <div style={{ fontFamily: "monospace", fontSize: pkg ? 18 : 22, fontWeight: 900, color: "#fff", letterSpacing: "0.1em" }}>
+          {displayRef}
         </div>
       </div>
 

@@ -9,13 +9,17 @@ from app.models.operator import Operator
 from app.models.trip import TripDirection, TripStatus
 from app.schemas.trip import (
     ArrivalRequest,
+    DropoffLocationResponse,
+    NotifyArrivalResponse,
     PublicTripResponse,
+    TripAnnouncementResponse,
     TripCreate,
     TripResponse,
     TripUpdate,
 )
 from app.services.trip_service import (
     _to_trip_response_dict,
+    build_announcement,
     complete_trip,
     compute_rate_display,
     compute_spots_remaining,
@@ -25,6 +29,7 @@ from app.services.trip_service import (
     get_trip,
     get_trip_stats,
     get_trips,
+    notify_arrival_blast,
     process_arrival,
     update_trip,
 )
@@ -131,7 +136,38 @@ async def get_public(
         operator_name=trip.operator.name,
         operator_business_name=trip.operator.business_name,
         operator_phone=trip.operator.phone,
+        operator_mailing_address_line1=trip.operator.mailing_address_line1,
+        operator_mailing_address_line2=trip.operator.mailing_address_line2,
+        operator_mailing_city=trip.operator.mailing_city,
+        operator_mailing_state=trip.operator.mailing_state,
+        operator_mailing_zip=trip.operator.mailing_zip,
+        operator_mailing_country=trip.operator.mailing_country,
+        operator_mailing_instructions=trip.operator.mailing_instructions,
+        drop_off_locations=[
+            DropoffLocationResponse(
+                id=loc.id,
+                label=loc.label,
+                address=loc.address,
+                city=loc.city,
+                state=loc.state,
+                display_order=loc.display_order,
+            )
+            for loc in trip.drop_off_locations
+        ],
     )
+
+
+# ── GET /trips/{trip_id}/announcement ────────────────────────────────────────
+
+@router.get("/{trip_id}/announcement", response_model=TripAnnouncementResponse)
+async def get_announcement(
+    trip_id: uuid.UUID,
+    operator: Operator = Depends(get_current_operator),
+    db: AsyncSession   = Depends(get_db),
+):
+    """Return a pre-formatted WhatsApp announcement message for the trip."""
+    trip = await get_trip(db, trip_id, operator.id)
+    return build_announcement(trip)
 
 
 # ── GET /trips/{trip_id} ──────────────────────────────────────────────────────
@@ -201,7 +237,6 @@ async def arrive(
     body: ArrivalRequest,
     operator: Operator = Depends(get_current_operator),
     db: AsyncSession   = Depends(get_db),
-    redis              = Depends(get_redis),
 ):
     trip = await get_trip(db, trip_id, operator.id)
     trip = await process_arrival(db, trip, body)
@@ -210,18 +245,22 @@ async def arrive(
     await db.commit()
     trip = await get_trip(db, trip_id, operator.id)
 
-    # Enqueue personalised WhatsApp blasts to every sender whose booking is ready
-    try:
-        await redis.enqueue_job(
-            "send_arrival_blast_task",
-            trip_id=str(trip.id),
-            operator_id=str(operator.id),
-        )
-    except Exception:
-        pass  # never fail the HTTP response because the queue is unavailable
-
     stats = await get_trip_stats(db, trip.id)
     return TripResponse(**_to_trip_response_dict(trip, booking_counts=stats))
+
+
+# ── POST /trips/{trip_id}/notify-arrival ─────────────────────────────────────
+
+@router.post("/{trip_id}/notify-arrival", response_model=NotifyArrivalResponse)
+async def notify_arrival(
+    trip_id: uuid.UUID,
+    operator: Operator = Depends(get_current_operator),
+    db: AsyncSession   = Depends(get_db),
+):
+    trip = await get_trip(db, trip_id, operator.id)
+    sent, failed = await notify_arrival_blast(db, trip)
+    await db.commit()
+    return NotifyArrivalResponse(notified=sent, failed=failed)
 
 
 # ── POST /trips/{trip_id}/complete ────────────────────────────────────────────

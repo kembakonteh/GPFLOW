@@ -1,14 +1,15 @@
 // ── Enums (mirror backend Python enums) ──────────────────────────────────────
 
-export type TripDirection  = 'outbound' | 'inbound';
-export type TripStatus     = 'draft' | 'open' | 'closed' | 'in_transit' | 'arrived' | 'completed';
-export type PricingModel   = 'per_kg' | 'per_item' | 'flat';
-export type BookingStatus  = 'confirmed' | 'received' | 'in_transit' | 'ready' | 'collected' | 'delivered' | 'held';
-export type CollectionType = 'self_collect' | 'operator_delivers';
-export type PaymentStatus  = 'unpaid' | 'paid' | 'refunded';
-export type OperatorTier   = 'starter' | 'regular' | 'pro';
-export type OperatorStatus = 'onboarding' | 'active' | 'suspended';
-export type WeightUnit     = 'kg' | 'lbs';
+export type TripDirection    = 'outbound' | 'inbound';
+export type TripStatus       = 'draft' | 'open' | 'closed' | 'in_transit' | 'arrived' | 'completed';
+export type PricingModel     = 'per_kg' | 'per_item' | 'flat';
+export type BookingStatus    = 'confirmed' | 'received' | 'in_transit' | 'ready' | 'collected' | 'delivered' | 'held';
+export type CollectionType   = 'self_collect' | 'operator_delivers';
+export type PaymentStatus    = 'unpaid' | 'paid' | 'refunded';
+export type OperatorTier     = 'starter' | 'regular' | 'pro';
+export type OperatorStatus   = 'onboarding' | 'active' | 'suspended';
+export type WeightUnit       = 'kg' | 'lbs';
+export type PackageScanStatus = 'pending' | 'received' | 'delivered';
 
 // ── Operator ─────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,14 @@ export interface Operator {
   onboarding_checklist: OnboardingChecklist;
   created_at:           string;
   updated_at:           string;
+  // Mailing address
+  mailing_address_line1?: string;
+  mailing_address_line2?: string;
+  mailing_city?:          string;
+  mailing_state?:         string;
+  mailing_zip?:           string;
+  mailing_country?:       string;
+  mailing_instructions?:  string;
 }
 
 export interface OnboardingChecklist {
@@ -69,6 +78,32 @@ export interface RegisterRequest {
   weight_unit?:  WeightUnit;
 }
 
+// ── Trip announcement ─────────────────────────────────────────────────────────
+
+export interface TripAnnouncement {
+  whatsapp_message: string;
+  public_url:       string;
+}
+
+// ── Drop-off location ─────────────────────────────────────────────────────────
+
+export interface DropoffLocation {
+  id:            string;
+  label:         string;
+  address?:      string;
+  city?:         string;
+  state?:        string;
+  display_order: number;
+}
+
+export interface DropoffLocationCreate {
+  label:         string;
+  address?:      string;
+  city?:         string;
+  state?:        string;
+  display_order?: number;
+}
+
 // ── Trip ─────────────────────────────────────────────────────────────────────
 
 export interface Trip {
@@ -91,11 +126,12 @@ export interface Trip {
   customs_advisory?:   string;
   public_slug:         string;
   view_count:          number;
-  pickup_location?:    string;
-  pickup_window?:      string;
-  pickup_notes?:       string;
-  arrived_at?:         string;
-  operator_name:       string;
+  pickup_location?:      string;
+  pickup_window?:        string;
+  pickup_notes?:         string;
+  arrived_at?:           string;
+  arrival_notified_at?:  string;
+  operator_name:         string;
   operator_business_name: string;
   booking_counts?: {
     total:      number;
@@ -106,6 +142,7 @@ export interface Trip {
     collected:  number;
     delivered:  number;
   };
+  drop_off_locations?: DropoffLocation[];
   created_at: string;
   updated_at: string;
 }
@@ -143,6 +180,19 @@ export interface ArrivalRequest {
   }>;
 }
 
+// ── BookingPackage ────────────────────────────────────────────────────────────
+
+export interface BookingPackage {
+  id:                string;
+  package_number:    number;
+  description:       string | null;
+  package_reference: string;
+  weight_kg:         number | null;
+  qr_code:           string | null;
+  scan_status:       PackageScanStatus;
+  scanned_at:        string | null;
+}
+
 // ── Booking ───────────────────────────────────────────────────────────────────
 
 export interface Booking {
@@ -171,6 +221,16 @@ export interface Booking {
   qr_label_url?:         string;
   last_scanned_at?: string;
   scan_count:       number;
+  package_count:    number;
+  packages:         BookingPackage[];
+  // Delivery address
+  delivery_address_line1?: string;
+  delivery_address_line2?: string;
+  delivery_city?:          string;
+  delivery_state?:         string;
+  delivery_zip?:           string;
+  delivery_country?:       string;
+  delivery_notes?:         string;
   trip_public_slug?:    string;
   trip_departure_date?: string;
   trip_direction?:      string;
@@ -234,6 +294,15 @@ export interface PublicTrip {
   operator_name:       string;
   operator_business_name: string;
   operator_phone:      string;
+  // Operator mailing address
+  operator_mailing_address_line1?: string;
+  operator_mailing_address_line2?: string;
+  operator_mailing_city?:          string;
+  operator_mailing_state?:         string;
+  operator_mailing_zip?:           string;
+  operator_mailing_country?:       string;
+  operator_mailing_instructions?:  string;
+  drop_off_locations?: DropoffLocation[];
 }
 
 // ── Tracking (public) ──────────────────────────────────────────────────────────
@@ -282,6 +351,12 @@ export interface BookingPublicCreate {
   estimated_weight_kg: number;
 }
 
+export interface BookingPackagePublic {
+  package_number:    number;
+  package_reference: string;
+  description:       string | null;
+}
+
 export interface BookingPublicResponse {
   id:                     string;
   reference_number:       string;
@@ -294,4 +369,14 @@ export interface BookingPublicResponse {
   recipient_city:         string;
   item_description:       string;
   estimated_weight_kg:    number;
+  package_count:          number;
+  packages:               BookingPackagePublic[];
+  // Delivery address (optional)
+  delivery_address_line1?: string;
+  delivery_address_line2?: string;
+  delivery_city?:          string;
+  delivery_state?:         string;
+  delivery_zip?:           string;
+  delivery_country?:       string;
+  delivery_notes?:         string;
 }

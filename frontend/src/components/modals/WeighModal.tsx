@@ -4,7 +4,7 @@ import { api } from "../../lib/api";
 import Modal from "../ui/Modal";
 import CloseBtn from "../ui/CloseBtn";
 import QRLabel from "../ui/QRLabel";
-import type { Booking, Trip } from "../../types";
+import type { Booking, BookingPackage, Trip } from "../../types";
 
 type State = "weigh" | "label";
 
@@ -13,32 +13,50 @@ interface Props {
   trip: Trip;
   onClose: () => void;
   onDone: (updated: Booking) => void;
-  onBack: () => void; // → return to WeighListModal
+  onBack: () => void;
 }
 
 export default function WeighModal({ booking, trip, onClose, onDone, onBack }: Props) {
-  const [state, setState] = useState<State>("weigh");
-  const [lbs, setLbs] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [updatedBooking, setUpdatedBooking] = useState<Booking>(booking);
-  const [screenMode, setScreenMode] = useState(false);
-  const [error, setError] = useState("");
+  const isMulti = booking.packages.length > 1;
+
+  // For multi-package: start on first unweighed package
+  const firstUnweighedIdx = isMulti
+    ? Math.max(0, booking.packages.findIndex((p) => p.weight_kg == null))
+    : 0;
+
+  const [pkgIdx,        setPkgIdx]        = useState(firstUnweighedIdx);
+  const [state,         setState]         = useState<State>("weigh");
+  const [lbs,           setLbs]           = useState("");
+  const [loading,       setLoading]       = useState(false);
+  const [latestBooking, setLatestBooking] = useState<Booking>(booking);
+  const [screenMode,    setScreenMode]    = useState(false);
+  const [error,         setError]         = useState("");
+
+  const pkg: BookingPackage | undefined = latestBooking.packages[pkgIdx];
+  const allWeighed = latestBooking.packages.every((p) => p.weight_kg != null);
+  const isLastPkg  = pkgIdx === latestBooking.packages.length - 1 || allWeighed;
 
   const rateLb = trip.rate_per_kg / KG_TO_LB;
   const lbsNum = parseFloat(lbs) || 0;
-  const cost = (lbsNum * rateLb).toFixed(2);
+  const cost   = (lbsNum * rateLb).toFixed(2);
   const currSym = trip.currency === "USD" ? "$" : trip.currency === "GBP" ? "£" : "€";
+
+  // Running total of weighed packages in lbs
+  const weighedLbs = latestBooking.packages
+    .filter((p) => p.weight_kg != null)
+    .reduce((s, p) => s + Number(p.weight_kg!) * KG_TO_LB, 0);
 
   async function confirmWeigh() {
     if (lbsNum <= 0 || loading) return;
     setLoading(true);
     setError("");
     try {
-      const kg = lbsNum / KG_TO_LB;
-      const { data } = await api.post<Booking>(`/bookings/${booking.id}/weigh`, {
-        confirmed_weight_kg: kg,
-      });
-      setUpdatedBooking(data);
+      const kg      = lbsNum / KG_TO_LB;
+      const payload: Record<string, unknown> = { confirmed_weight_kg: kg };
+      if (isMulti && pkg) payload.package_id = pkg.id;
+
+      const { data } = await api.post<Booking>(`/bookings/${booking.id}/weigh`, payload);
+      setLatestBooking(data);
       setState("label");
     } catch (e: unknown) {
       const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -48,32 +66,44 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
     }
   }
 
-  function handlePrint() {
-    window.print();
+  function handleNextPackage() {
+    // Find next unweighed package after current
+    const nextIdx = latestBooking.packages.findIndex(
+      (p, i) => i > pkgIdx && p.weight_kg == null
+    );
+    if (nextIdx !== -1) {
+      setPkgIdx(nextIdx);
+      setLbs("");
+      setState("weigh");
+    } else {
+      // All done
+      onDone(latestBooking);
+      onBack();
+    }
   }
 
-  function handleScreen() {
-    setScreenMode(true);
+  function handleDone() {
+    onDone(latestBooking);
+    onBack();
   }
 
-  // Build the WhatsApp URL at render time so it can be used as a plain <a href>
+  // WhatsApp URL (single link for the booking, regardless of package count)
   const waHref = (() => {
-    const fn = updatedBooking.sender_name.split(" ")[0];
-    const recipient = updatedBooking.recipient_name;
-    const city = updatedBooking.recipient_city;
-    const ref = updatedBooking.reference_number;
-    const op = trip.operator_business_name;
+    const b   = latestBooking;
+    const fn  = b.sender_name.split(" ")[0];
+    const ref = b.reference_number;
+    const op  = trip.operator_business_name;
     const trackUrl = `${window.location.origin}/track/${ref}`;
     const msg = encodeURIComponent(
-      `Hi ${fn} 👋\nHere is the tracking link for ${recipient}'s package 🏷️\n\n` +
+      `Hi ${fn} 👋\nHere is the tracking link for ${b.recipient_name}'s package 🏷️\n\n` +
       `📲 ${trackUrl}\n\n` +
-      `Please forward this to ${recipient} in ${city} so they can track the package and show their reference number when collecting.\n\n` +
+      `Please forward this to ${b.recipient_name} in ${b.recipient_city} so they can track the package and show their reference number when collecting.\n\n` +
       `Ref: ${ref}\n— ${op} via GPFLOW`
     );
     return `https://wa.me/?text=${msg}`;
   })();
 
-  if (screenMode) {
+  if (screenMode && pkg) {
     return (
       <div style={{
         position: "fixed", inset: 0, zIndex: 9999,
@@ -88,7 +118,7 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
           Hold up — sender takes a screenshot of this label
         </div>
         <div style={{ flex: 1, overflowY: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 20px 8px" }}>
-          <QRLabel booking={updatedBooking} trip={trip} />
+          <QRLabel booking={latestBooking} trip={trip} pkg={isMulti ? pkg : undefined} />
         </div>
         <div style={{ display: "flex", gap: 0, width: "100%", maxWidth: 540, flexShrink: 0 }}>
           <button
@@ -101,11 +131,9 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
               fontFamily: "'DM Sans',sans-serif",
               borderRight: `1px solid ${C.border}`,
             }}
-          >
-            ←
-          </button>
+          >←</button>
           <button
-            onClick={() => { onDone(updatedBooking); onBack(); }}
+            onClick={() => { setScreenMode(false); if (isLastPkg) handleDone(); else handleNextPackage(); }}
             style={{
               flex: 1,
               background: C.accent, color: "#07090F",
@@ -114,7 +142,7 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
               fontFamily: "'DM Sans',sans-serif",
             }}
           >
-            ✓ Done — Next Package
+            {isLastPkg ? "✓ Done" : "✓ Next Package →"}
           </button>
         </div>
       </div>
@@ -128,7 +156,7 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
 
         {state === "weigh" ? (
           <>
-            {/* Booking summary */}
+            {/* Booking / package header */}
             <div style={{ marginBottom: 18, paddingRight: 40 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
                 <div style={{
@@ -144,9 +172,27 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
                   <div style={{ fontSize: 12, color: C.textSub }}>
                     {booking.item_description} → {booking.recipient_name}, {booking.recipient_city}
                   </div>
+                  {isMulti && pkg && (
+                    <div style={{ fontSize: 11, color: C.gold, fontWeight: 700, marginTop: 3 }}>
+                      Package {pkg.package_number} of {latestBooking.packages.length} — {pkg.package_reference}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
+
+            {/* Running total for multi-package */}
+            {isMulti && weighedLbs > 0 && (
+              <div style={{
+                background: C.card2, border: `1px solid ${C.border}`,
+                borderRadius: 10, padding: "8px 14px", marginBottom: 14,
+                fontSize: 12, color: C.textSub,
+                display: "flex", justifyContent: "space-between",
+              }}>
+                <span>Total so far</span>
+                <span style={{ fontWeight: 700, color: C.text }}>{weighedLbs.toFixed(1)} lbs</span>
+              </div>
+            )}
 
             {/* Weight input */}
             <div style={{ marginBottom: 16 }}>
@@ -184,13 +230,10 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
                   <span style={{ fontSize: 13, color: C.textSub }}>{lbsNum}lbs × {currSym}{rateLb.toFixed(2)}/lb</span>
                   <span style={{ fontSize: 24, fontWeight: 900, color: C.gold }}>{currSym}{cost}</span>
                 </div>
-                <div style={{ fontSize: 11, color: C.textSub }}>
-                  = {(lbsNum / KG_TO_LB).toFixed(2)}kg
-                </div>
+                <div style={{ fontSize: 11, color: C.textSub }}>= {(lbsNum / KG_TO_LB).toFixed(2)}kg</div>
               </div>
             )}
 
-            {/* Error */}
             {error && (
               <div style={{
                 background: "rgba(244,63,94,0.1)", border: "1px solid rgba(244,63,94,0.3)",
@@ -201,7 +244,6 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
               </div>
             )}
 
-            {/* CTA */}
             <button
               onClick={confirmWeigh}
               disabled={lbsNum <= 0 || loading}
@@ -222,35 +264,35 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
           </>
         ) : (
           <>
-            {/* Label state — actions FIRST so they're visible without scrolling */}
+            {/* Label state */}
             <div style={{ marginBottom: 14, paddingRight: 40 }}>
               <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 2 }}>🏷️ QR Label Ready</div>
               <div style={{ fontSize: 12, color: C.textSub }}>
-                {updatedBooking.sender_name} · {updatedBooking.reference_number}
+                {latestBooking.sender_name} · {isMulti && pkg ? pkg.package_reference : latestBooking.reference_number}
               </div>
             </div>
 
-            {/* 3 action buttons — shown immediately */}
+            {/* Action buttons */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-              <button onClick={handleScreen} style={optBtn(C.blue)}>
+              <button onClick={() => setScreenMode(true)} style={optBtn(C.blue)}>
                 <span>📱 Show Label on Screen</span>
                 <span style={{ fontSize: 12, color: C.textSub }}>Sender takes a screenshot for their records</span>
               </button>
               <a href={waHref} style={{ ...optBtn("#25D366"), textDecoration: "none" }}>
                 <span>📲 Send via WhatsApp</span>
                 <span style={{ fontSize: 12, color: C.textSub }}>
-                  Sends to {booking.sender_name.split(" ")[0]} to forward to {booking.recipient_name} in {booking.recipient_city}
+                  Sends tracking link to {booking.sender_name.split(" ")[0]}
                 </span>
               </a>
-              <button onClick={handlePrint} style={optBtn(C.teal)}>
+              <button onClick={() => window.print()} style={optBtn(C.teal)}>
                 <span>🖨️ Print Label</span>
                 <span style={{ fontSize: 12, color: C.textSub }}>Send to printer</span>
               </button>
             </div>
 
-            {/* Done button — above preview so it's always visible */}
+            {/* Done / Next */}
             <button
-              onClick={() => { onDone(updatedBooking); onBack(); }}
+              onClick={isLastPkg ? handleDone : handleNextPackage}
               style={{
                 width: "100%",
                 background: `linear-gradient(135deg,${C.accent},#00A87A)`,
@@ -261,14 +303,14 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
                 marginBottom: 16,
               }}
             >
-              <span>✓ Done — Next Package</span>
+              <span>{isLastPkg ? "✓ Done" : "✓ Next Package →"}</span>
               <span>→</span>
             </button>
 
-            {/* Label preview — scrollable below */}
+            {/* Label preview */}
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
               <div style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.5)", borderRadius: 14, transform: "scale(0.92)", transformOrigin: "top center" }}>
-                <QRLabel booking={updatedBooking} trip={trip} />
+                <QRLabel booking={latestBooking} trip={trip} pkg={isMulti && pkg ? pkg : undefined} />
               </div>
             </div>
           </>

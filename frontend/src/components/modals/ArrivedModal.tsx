@@ -6,6 +6,8 @@ import CloseBtn from "../ui/CloseBtn";
 import WaBubble from "../ui/WaBubble";
 import type { Booking, Trip } from "../../types";
 
+type Step = "form" | "notify" | "done";
+
 interface Props {
   trip: Trip;
   bookings: Booking[];
@@ -14,11 +16,13 @@ interface Props {
 }
 
 export default function ArrivedModal({ trip, bookings, onClose, onArrived }: Props) {
+  const [step, setStep]           = useState<Step>("form");
   const [location, setLocation]   = useState("");
   const [dateFrom, setDateFrom]   = useState("");
   const [dateTo, setDateTo]       = useState("");
   const [hours, setHours]         = useState("10am – 4pm");
   const [loading, setLoading]     = useState(false);
+  const [notifiedCount, setNotifiedCount] = useState(0);
 
   const weighed = bookings.filter((b) => b.confirmed_weight_kg != null);
   const sample  = weighed[0];
@@ -45,10 +49,10 @@ export default function ArrivedModal({ trip, bookings, onClose, onArrived }: Pro
     );
   }
 
-  const canSubmit = location && dateFrom && !loading;
+  const canConfirm = location && dateFrom && !loading;
 
-  async function notifyAll() {
-    if (!canSubmit) return;
+  async function confirmArrival() {
+    if (!canConfirm) return;
     setLoading(true);
     try {
       await api.post(`/trips/${trip.id}/arrive`, {
@@ -59,7 +63,21 @@ export default function ArrivedModal({ trip, bookings, onClose, onArrived }: Pro
           collection_type: "self_collect",
         })),
       });
-      onArrived();
+      setStep("notify");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function sendNotifications() {
+    setLoading(true);
+    try {
+      const { data } = await api.post<{ notified: number; failed: number }>(
+        `/trips/${trip.id}/notify-arrival`
+      );
+      setNotifiedCount(data.notified);
+      setStep("done");
+      onArrived(); // invalidate queries so dashboard reflects arrival_notified_at
     } finally {
       setLoading(false);
     }
@@ -70,87 +88,178 @@ export default function ArrivedModal({ trip, bookings, onClose, onArrived }: Pro
       <div style={{ position: "relative", padding: "8px 20px 28px" }}>
         <CloseBtn onClick={onClose} />
 
-        <div style={{ paddingRight: 40, marginBottom: 18 }}>
-          <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🇬🇲 We've Arrived!</div>
-          <div style={{ fontSize: 12, color: C.textSub }}>
-            {weighed.length} personalised WhatsApp messages will be sent.
-          </div>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 18 }}>
-          <div>
-            <label style={lbl}>Collection Location *</label>
-            <input
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="e.g. 14 Kairaba Avenue, Serrekunda"
-              style={inp}
-            />
-          </div>
-
-          <div>
-            <label style={lbl}>Collection Window</label>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ ...inp, flex: 1 }} />
-              <span style={{ color: C.textSub }}>→</span>
-              <input type="date" value={dateTo} min={dateFrom} onChange={(e) => setDateTo(e.target.value)} style={{ ...inp, flex: 1 }} />
+        {/* ── Step: form ─────────────────────────────────────────────────── */}
+        {step === "form" && (
+          <>
+            <div style={{ paddingRight: 40, marginBottom: 18 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🇬🇲 We've Arrived!</div>
+              <div style={{ fontSize: 12, color: C.textSub }}>
+                Set pickup details, then choose whether to notify customers.
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>
-              Not everyone can come same day — a window gives flexibility.
-            </div>
-          </div>
 
-          <div>
-            <label style={lbl}>Daily Hours</label>
-            <input
-              value={hours}
-              onChange={(e) => setHours(e.target.value)}
-              placeholder="10am – 4pm"
-              style={inp}
-            />
-          </div>
-        </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 18 }}>
+              <div>
+                <label style={lbl}>Collection Location *</label>
+                <input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="e.g. 14 Kairaba Avenue, Serrekunda"
+                  style={inp}
+                />
+              </div>
 
-        {/* Sample message */}
-        {sample && location && dateFrom && (
-          <div style={{
-            background: "#070C16", border: `1px solid ${C.border}`,
-            borderRadius: 14, overflow: "hidden", marginBottom: 18,
-          }}>
-            <div style={{
-              background: C.card2, padding: "10px 16px",
-              borderBottom: `1px solid ${C.border}`,
-              fontSize: 11, color: C.textSub, fontWeight: 600,
-            }}>
-              Sample Message (1 of {weighed.length}) · Each sender gets their own.
+              <div>
+                <label style={lbl}>Collection Window</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ ...inp, flex: 1 }} />
+                  <span style={{ color: C.textSub }}>→</span>
+                  <input type="date" value={dateTo} min={dateFrom} onChange={(e) => setDateTo(e.target.value)} style={{ ...inp, flex: 1 }} />
+                </div>
+                <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>
+                  Not everyone can come same day — a window gives flexibility.
+                </div>
+              </div>
+
+              <div>
+                <label style={lbl}>Daily Hours</label>
+                <input
+                  value={hours}
+                  onChange={(e) => setHours(e.target.value)}
+                  placeholder="10am – 4pm"
+                  style={inp}
+                />
+              </div>
             </div>
-            <div style={{ padding: "14px" }}>
-              <WaBubble
-                msg={buildMsg(sample)}
-                time="Now"
-                operatorName={op}
-              />
-            </div>
-          </div>
+
+            {/* Sample message */}
+            {sample && location && dateFrom && (
+              <div style={{
+                background: "#070C16", border: `1px solid ${C.border}`,
+                borderRadius: 14, overflow: "hidden", marginBottom: 18,
+              }}>
+                <div style={{
+                  background: C.card2, padding: "10px 16px",
+                  borderBottom: `1px solid ${C.border}`,
+                  fontSize: 11, color: C.textSub, fontWeight: 600,
+                }}>
+                  Sample Message (1 of {weighed.length}) · Each sender gets their own.
+                </div>
+                <div style={{ padding: "14px" }}>
+                  <WaBubble msg={buildMsg(sample)} time="Now" operatorName={op} />
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={confirmArrival}
+              disabled={!canConfirm}
+              style={{
+                width: "100%",
+                background: canConfirm ? `linear-gradient(135deg,${C.orange},#EA580C)` : C.border,
+                color: canConfirm ? "#07090F" : C.textDim,
+                border: "none", borderRadius: 16,
+                padding: "18px 22px", fontSize: 16, fontWeight: 900,
+                cursor: canConfirm ? "pointer" : "not-allowed",
+                fontFamily: "'DM Sans',sans-serif",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}
+            >
+              <span>{loading ? "Confirming…" : "🇬🇲 Confirm Arrival"}</span>
+              {!loading && <span>→</span>}
+            </button>
+          </>
         )}
 
-        <button
-          onClick={notifyAll}
-          disabled={!canSubmit}
-          style={{
-            width: "100%",
-            background: canSubmit ? `linear-gradient(135deg,${C.orange},#EA580C)` : C.border,
-            color: canSubmit ? "#07090F" : C.textDim,
-            border: "none", borderRadius: 16,
-            padding: "18px 22px", fontSize: 16, fontWeight: 900,
-            cursor: canSubmit ? "pointer" : "not-allowed",
-            fontFamily: "'DM Sans',sans-serif",
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-          }}
-        >
-          <span>{loading ? "Sending…" : "🇬🇲 Notify All Senders"}</span>
-          {!loading && <span>→</span>}
-        </button>
+        {/* ── Step: notify ───────────────────────────────────────────────── */}
+        {step === "notify" && (
+          <>
+            <div style={{ paddingRight: 40, marginBottom: 24 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>✅ Arrival Confirmed!</div>
+              <div style={{ fontSize: 12, color: C.textSub }}>
+                Trip is now marked as arrived. Do you want to notify customers?
+              </div>
+            </div>
+
+            <div style={{
+              background: C.accentDim, border: `1px solid ${C.accentBorder}`,
+              borderRadius: 16, padding: "20px",
+              textAlign: "center", marginBottom: 20,
+            }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>📲</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: C.accent, marginBottom: 4 }}>
+                {weighed.length} customer{weighed.length !== 1 ? "s" : ""}
+              </div>
+              <div style={{ fontSize: 13, color: C.textSub }}>
+                will receive a personalised WhatsApp message with pickup details
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button
+                onClick={sendNotifications}
+                disabled={loading}
+                style={{
+                  width: "100%",
+                  background: loading ? C.border : `linear-gradient(135deg,${C.accent},#00A87A)`,
+                  color: loading ? C.textDim : "#07090F",
+                  border: "none", borderRadius: 16,
+                  padding: "18px 22px", fontSize: 15, fontWeight: 900,
+                  cursor: loading ? "not-allowed" : "pointer",
+                  fontFamily: "'DM Sans',sans-serif",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}
+              >
+                <span>{loading ? "Sending…" : "📲 Send Notifications"}</span>
+                {!loading && <span>→</span>}
+              </button>
+
+              <button
+                onClick={() => { onArrived(); onClose(); }}
+                disabled={loading}
+                style={{
+                  width: "100%",
+                  background: "transparent", border: `1px solid ${C.border}`,
+                  borderRadius: 14, padding: "14px",
+                  color: C.textSub, fontSize: 13, fontWeight: 700,
+                  cursor: loading ? "not-allowed" : "pointer",
+                  fontFamily: "'DM Sans',sans-serif",
+                }}
+              >
+                Skip for now
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ── Step: done ─────────────────────────────────────────────────── */}
+        {step === "done" && (
+          <>
+            <div style={{ textAlign: "center", padding: "20px 0 28px" }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>
+                {notifiedCount} customer{notifiedCount !== 1 ? "s" : ""} notified!
+              </div>
+              <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.6 }}>
+                Each sender received a personalised WhatsApp message with pickup details.
+                They can also track their parcel at gpflow.app/track.
+              </div>
+            </div>
+
+            <button
+              onClick={onClose}
+              style={{
+                width: "100%",
+                background: `linear-gradient(135deg,${C.accent},#00A87A)`,
+                color: "#07090F", border: "none", borderRadius: 16,
+                padding: "16px", fontSize: 15, fontWeight: 900,
+                cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+              }}
+            >
+              Done
+            </button>
+          </>
+        )}
       </div>
     </Modal>
   );

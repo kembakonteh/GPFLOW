@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.models.booking import BookingStatus, CollectionType, PaymentStatus
+from app.models.booking import BookingStatus, CollectionType, PackageScanStatus, PaymentStatus
 
 
 # ── Request bodies ────────────────────────────────────────────────────────────
@@ -33,9 +33,22 @@ class BookingCreate(BaseModel):
     recipient_city:  str        = Field(..., min_length=1, max_length=100)
 
     # Item
-    item_description:  str   = Field(..., min_length=1, max_length=500)
-    quantity:          int   = Field(1, ge=1, le=999)
+    item_description:    str     = Field(..., min_length=1, max_length=500)
+    quantity:            int     = Field(1, ge=1, le=999)
     estimated_weight_kg: Decimal = Field(Decimal("0"), ge=Decimal("0"), le=Decimal("9999"))
+    package_count:       int     = Field(1, ge=1, le=20)
+
+    # Customer's preferred collection method — operator can override at arrival
+    collection_type: CollectionType | None = None
+
+    # Delivery address — optional, for operator_delivers bookings
+    delivery_address_line1: str | None = Field(None, max_length=255)
+    delivery_address_line2: str | None = Field(None, max_length=255)
+    delivery_city:          str | None = Field(None, max_length=100)
+    delivery_state:         str | None = Field(None, max_length=100)
+    delivery_zip:           str | None = Field(None, max_length=20)
+    delivery_country:       str | None = Field(None, max_length=2)
+    delivery_notes:         str | None = Field(None, max_length=500)
 
     @model_validator(mode="after")
     def _names_not_same(self) -> "BookingCreate":
@@ -47,8 +60,15 @@ class BookingCreate(BaseModel):
 
 class WeighInRequest(BaseModel):
     """Operator records the actual weight at drop-off."""
-    confirmed_weight_kg: Decimal = Field(..., gt=Decimal("0"), le=Decimal("9999"))
-    payment_status: PaymentStatus | None = None
+    confirmed_weight_kg: Decimal   = Field(..., gt=Decimal("0"), le=Decimal("9999"))
+    payment_status:      PaymentStatus | None = None
+    package_id:          uuid.UUID | None     = None
+
+
+class PackageScanRequest(BaseModel):
+    """Operator scans a package QR code to record receipt or delivery."""
+    package_reference: str
+    action:            str  # "received" | "delivered"
 
 
 class PaymentUpdate(BaseModel):
@@ -76,6 +96,27 @@ class StatusUpdate(BaseModel):
 
 # ── Response schemas ──────────────────────────────────────────────────────────
 
+class PackageResponse(BaseModel):
+    """Per-package detail included in BookingResponse."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id:                uuid.UUID
+    package_number:    int
+    description:       str | None
+    package_reference: str
+    weight_kg:         Decimal | None
+    qr_code:           str | None
+    scan_status:       str
+    scanned_at:        datetime | None
+
+
+class PackagePublicResponse(BaseModel):
+    """Minimal package info returned to the sender after booking."""
+    package_number:    int
+    package_reference: str
+    description:       str | None
+
+
 class BookingResponse(BaseModel):
     """Full detail response for the operator."""
     model_config = ConfigDict(from_attributes=True)
@@ -95,6 +136,7 @@ class BookingResponse(BaseModel):
 
     item_description: str
     quantity:         int
+    package_count:    int
     estimated_weight_kg:  Decimal
     confirmed_weight_kg:  Decimal | None
 
@@ -114,6 +156,15 @@ class BookingResponse(BaseModel):
     last_scanned_at: datetime | None
     scan_count:      int
 
+    # Delivery address
+    delivery_address_line1: str | None
+    delivery_address_line2: str | None
+    delivery_city:          str | None
+    delivery_state:         str | None
+    delivery_zip:           str | None
+    delivery_country:       str | None
+    delivery_notes:         str | None
+
     created_at: datetime
     updated_at: datetime
 
@@ -121,6 +172,16 @@ class BookingResponse(BaseModel):
     trip_public_slug:    str | None = None
     trip_departure_date: date | None = None
     trip_direction:      str | None = None
+
+    # Per-package breakdown
+    packages: list[PackageResponse] = []
+
+
+class PackageScanResponse(BaseModel):
+    """Returned after scanning a package QR code."""
+    booking:               BookingResponse
+    package:               PackageResponse
+    booking_fully_updated: bool
 
 
 class BookingPublicResponse(BaseModel):
@@ -137,6 +198,17 @@ class BookingPublicResponse(BaseModel):
     recipient_city: str
     item_description: str
     estimated_weight_kg: Decimal
+    package_count:       int = 1
+    packages:            list[PackagePublicResponse] = []
+
+    # Delivery address — echoed back so confirmation page can display it
+    delivery_address_line1: str | None = None
+    delivery_address_line2: str | None = None
+    delivery_city:          str | None = None
+    delivery_state:         str | None = None
+    delivery_zip:           str | None = None
+    delivery_country:       str | None = None
+    delivery_notes:         str | None = None
 
 
 # ── Tracking (public, sender-facing) ─────────────────────────────────────────

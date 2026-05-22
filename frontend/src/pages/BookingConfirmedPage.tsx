@@ -4,6 +4,15 @@ import { C } from "../lib/tokens";
 import WaBubble from "../components/ui/WaBubble";
 import type { BookingPublicResponse, PublicTrip } from "../types";
 
+function formatAddress(b: BookingPublicResponse): string | null {
+  if (!b.delivery_address_line1) return null;
+  const parts = [b.delivery_address_line1];
+  if (b.delivery_address_line2) parts.push(b.delivery_address_line2);
+  const city = [b.delivery_city, b.delivery_state, b.delivery_zip].filter(Boolean).join(" ");
+  if (city) parts.push(city);
+  return parts.join(", ");
+}
+
 export default function BookingConfirmedPage() {
   useParams<{ reference: string }>();
   const { state }              = useLocation() as { state?: { booking: BookingPublicResponse; trip: PublicTrip } };
@@ -79,15 +88,46 @@ export default function BookingConfirmedPage() {
           </p>
         </div>
 
-        {/* Reference */}
+        {/* Reference(s) */}
         <div style={{
           background: `linear-gradient(135deg,${C.accentDim},${C.card2})`,
           border: `1px solid ${C.accentBorder}`,
           borderRadius: 16, padding: "20px 24px", marginBottom: 18, textAlign: "center",
         }}>
-          <div style={{ fontSize: 11, color: C.textSub, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Your Reference Number</div>
-          <div style={{ fontFamily: "monospace", fontSize: 28, fontWeight: 800, color: C.accent, letterSpacing: "0.08em" }}>{ref}</div>
-          <div style={{ fontSize: 12, color: C.textSub, marginTop: 8 }}>Tracking link included in your WhatsApp confirmation</div>
+          {booking.package_count > 1 ? (
+            <>
+              <div style={{ fontSize: 11, color: C.textSub, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
+                Your Booking — {booking.package_count} Packages
+              </div>
+              <div style={{ fontFamily: "monospace", fontSize: 20, fontWeight: 800, color: C.accent, letterSpacing: "0.06em", marginBottom: 10 }}>{ref}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {booking.packages.map((pkg) => (
+                  <div
+                    key={pkg.package_reference}
+                    style={{
+                      background: C.card, border: `1px solid ${C.border}`,
+                      borderRadius: 8, padding: "8px 12px",
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                    }}
+                  >
+                    <span style={{ fontSize: 11, color: C.textSub }}>Package {pkg.package_number}</span>
+                    <code style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 800, color: C.teal }}>
+                      {pkg.package_reference}
+                    </code>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: C.textSub, marginTop: 10 }}>
+                Each package gets its own QR label at drop-off
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 11, color: C.textSub, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Your Reference Number</div>
+              <div style={{ fontFamily: "monospace", fontSize: 28, fontWeight: 800, color: C.accent, letterSpacing: "0.08em" }}>{ref}</div>
+              <div style={{ fontSize: 12, color: C.textSub, marginTop: 8 }}>Tracking link included in your WhatsApp confirmation</div>
+            </>
+          )}
         </div>
 
         {/* Summary */}
@@ -118,6 +158,45 @@ export default function BookingConfirmedPage() {
             <span style={{ flexShrink: 0 }}>⚖️</span>
             <span>Cost confirmed when operator weighs package at drop-off.</span>
           </div>
+
+          {/* Delivery address — shown when provided */}
+          {formatAddress(booking) && (
+            <div style={{
+              marginTop: 14,
+              background: C.card2, border: `1px solid ${C.border}`,
+              borderRadius: 10, padding: "12px 14px",
+            }}>
+              <div style={{ fontSize: 11, color: C.textSub, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                🚚 Delivery Address
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{formatAddress(booking)}</div>
+              {booking.delivery_notes && (
+                <div style={{ fontSize: 12, color: C.textSub, marginTop: 4 }}>{booking.delivery_notes}</div>
+              )}
+            </div>
+          )}
+
+          {/* Mailing address — shown for outbound trips when operator has one */}
+          {trip.direction === "outbound" && trip.operator_mailing_address_line1 && (
+            <div style={{
+              marginTop: 14,
+              background: C.accentDim, border: `1px solid ${C.accentBorder}`,
+              borderRadius: 10, padding: "12px 14px",
+            }}>
+              <div style={{ fontSize: 11, color: C.accent, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                📬 Mail Your Package To
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.7 }}>
+                {trip.operator_business_name}<br />
+                {trip.operator_mailing_address_line1}
+                {trip.operator_mailing_address_line2 && <><br />{trip.operator_mailing_address_line2}</>}
+                <br />{trip.operator_mailing_city}, {trip.operator_mailing_state} {trip.operator_mailing_zip}
+              </div>
+              {trip.operator_mailing_instructions && (
+                <div style={{ fontSize: 12, color: C.textSub, marginTop: 6 }}>{trip.operator_mailing_instructions}</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* WhatsApp preview */}
