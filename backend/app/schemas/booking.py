@@ -79,6 +79,11 @@ class PaymentUpdate(BaseModel):
     payment_status: PaymentStatus
 
 
+class MailingFeeUpdate(BaseModel):
+    """Operator records the actual USPS/UPS mailing cost after delivery."""
+    mailing_fee: Decimal = Field(..., ge=Decimal("0"), le=Decimal("9999"))
+
+
 class ScanRequest(BaseModel):
     """Operator scans a QR label to record a checkpoint."""
     note: str | None = Field(None, max_length=255)
@@ -168,6 +173,10 @@ class BookingResponse(BaseModel):
     delivery_country:       str | None
     delivery_notes:         str | None
     mailing_fee_charged:    Decimal | None
+
+    # Computed totals (cargo + mailing)
+    total_cost_minor: int | None = None
+    total_cost_usd:   float | None = None
 
     created_at: datetime
     updated_at: datetime

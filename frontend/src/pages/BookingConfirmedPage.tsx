@@ -159,17 +159,6 @@ export default function BookingConfirmedPage() {
             <span>Cost confirmed when operator weighs package at drop-off.</span>
           </div>
 
-          {Number(booking.mailing_fee_charged ?? 0) > 0 && (
-            <div style={{
-              background: C.accentDim, border: `1px solid ${C.accentBorder}`,
-              borderRadius: 10, padding: "10px 14px", marginTop: 8,
-              fontSize: 12, color: C.accent, display: "flex", gap: 8,
-            }}>
-              <span style={{ flexShrink: 0 }}>📬</span>
-              <span>Mailing fee (USPS/UPS): <strong>${Number(booking.mailing_fee_charged).toFixed(2)}</strong></span>
-            </div>
-          )}
-
           {/* Delivery address — shown when provided */}
           {formatAddress(booking) && (
             <div style={{

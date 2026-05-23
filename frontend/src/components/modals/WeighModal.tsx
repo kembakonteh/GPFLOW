@@ -41,9 +41,7 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
   const cost   = (lbsNum * rateLb).toFixed(2);
   const currSym = trip.currency === "USD" ? "$" : trip.currency === "GBP" ? "£" : "€";
 
-  const mailingRatePerLb = trip.domestic_mailing_rate_per_lb ?? 0;
-  const isMailingApplicable = booking.collection_type === "operator_delivers" && mailingRatePerLb > 0;
-  const mailingFee = lbsNum * mailingRatePerLb;
+  const isMailingApplicable = booking.collection_type === "operator_delivers";
 
   // Running total of weighed packages in lbs
   const weighedLbs = latestBooking.packages
@@ -230,25 +228,22 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
                 background: C.goldDim, border: `1px solid ${C.goldBorder}`,
                 borderRadius: 14, padding: "16px", marginBottom: 18,
               }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isMailingApplicable ? 8 : 6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                   <span style={{ fontSize: 13, color: C.textSub }}>{lbsNum}lbs × {currSym}{rateLb.toFixed(2)}/lb</span>
                   <span style={{ fontSize: 24, fontWeight: 900, color: C.gold }}>{currSym}{cost}</span>
                 </div>
-                {isMailingApplicable && (
-                  <>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                      <span style={{ fontSize: 13, color: C.textSub }}>📬 {lbsNum}lbs × {currSym}{mailingRatePerLb.toFixed(2)}/lb mailing</span>
-                      <span style={{ fontSize: 16, fontWeight: 700, color: C.accent }}>{currSym}{mailingFee.toFixed(2)}</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${C.goldBorder}`, paddingTop: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: C.gold }}>Total</span>
-                      <span style={{ fontSize: 20, fontWeight: 900, color: C.gold }}>{currSym}{(parseFloat(cost) + mailingFee).toFixed(2)}</span>
-                    </div>
-                  </>
-                )}
-                {!isMailingApplicable && (
-                  <div style={{ fontSize: 11, color: C.textSub }}>= {(lbsNum / KG_TO_LB).toFixed(2)}kg</div>
-                )}
+                <div style={{ fontSize: 11, color: C.textSub }}>= {(lbsNum / KG_TO_LB).toFixed(2)}kg</div>
+              </div>
+            )}
+
+            {isMailingApplicable && (
+              <div style={{
+                background: C.accentDim, border: `1px solid ${C.accentBorder}`,
+                borderRadius: 10, padding: "10px 14px", marginBottom: 14,
+                fontSize: 12, color: C.accent, display: "flex", gap: 8,
+              }}>
+                <span style={{ flexShrink: 0 }}>📬</span>
+                <span>Mailing cost will be entered after USPS/UPS visit</span>
               </div>
             )}
 

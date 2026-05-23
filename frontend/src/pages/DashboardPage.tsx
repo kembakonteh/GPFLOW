@@ -12,6 +12,7 @@ import DepartedModal from "../components/modals/DepartedModal";
 import CutoffModal from "../components/modals/CutoffModal";
 import ArrivedModal from "../components/modals/ArrivedModal";
 import ScanModal from "../components/modals/ScanModal";
+import MailingCostModal from "../components/modals/MailingCostModal";
 import type { Booking, Operator, Trip, TripAnnouncement } from "../types";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -71,6 +72,7 @@ export default function DashboardPage() {
   const [showReport, setShowReport] = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [annCopied, setAnnCopied] = useState(false);
+  const [mailingBookingId, setMailingBookingId] = useState<string | null>(null);
 
   // ── Data ──────────────────────────────────────────────────────────────
   const { data: operator } = useQuery<Operator>({
@@ -618,27 +620,38 @@ export default function DashboardPage() {
                           )}
                         </div>
                       </div>
-                      {isWeighed && (
-                        <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: C.accent }}>{b.confirmed_cost_display ?? ""}</div>
-                          <div style={{ fontSize: 11, color: C.textSub }}>
-                            {lbs}lbs{b.package_count > 1 ? ` · ${b.package_count} packages` : ""}
+                      {isWeighed && (() => {
+                        const isMailOp = b.collection_type === "operator_delivers";
+                        const hasMailing = isMailOp && b.mailing_fee_charged != null;
+                        const currSym = b.currency === "USD" ? "$" : b.currency === "GBP" ? "£" : "€";
+                        const costDisplay = hasMailing && b.total_cost_usd != null
+                          ? `${currSym}${b.total_cost_usd.toFixed(2)}`
+                          : b.confirmed_cost_display ?? "";
+                        return (
+                          <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: C.accent }}>{costDisplay}</div>
+                            <div style={{ fontSize: 11, color: C.textSub }}>
+                              {lbs}lbs{b.package_count > 1 ? ` · ${b.package_count} packages` : ""}
+                            </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); togglePayment(b); }}
+                              style={{
+                                background: b.payment_status === "paid" ? "rgba(0,212,160,0.12)" : "rgba(251,191,36,0.12)",
+                                border: `1px solid ${b.payment_status === "paid" ? C.accentBorder : C.goldBorder}`,
+                                borderRadius: 8, padding: "3px 8px",
+                                fontSize: 10, fontWeight: 700,
+                                color: b.payment_status === "paid" ? C.accent : C.gold,
+                                cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                              }}
+                            >
+                              {b.payment_status === "paid" ? "✓ Paid" : "💰 Unpaid"}
+                            </button>
+                            {isMailOp && !hasMailing && (
+                              <div style={{ fontSize: 9, color: C.gold, fontWeight: 700 }}>⚠️ Mailing TBD</div>
+                            )}
                           </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); togglePayment(b); }}
-                            style={{
-                              background: b.payment_status === "paid" ? "rgba(0,212,160,0.12)" : "rgba(251,191,36,0.12)",
-                              border: `1px solid ${b.payment_status === "paid" ? C.accentBorder : C.goldBorder}`,
-                              borderRadius: 8, padding: "3px 8px",
-                              fontSize: 10, fontWeight: 700,
-                              color: b.payment_status === "paid" ? C.accent : C.gold,
-                              cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
-                            }}
-                          >
-                            {b.payment_status === "paid" ? "✓ Paid" : "💰 Unpaid"}
-                          </button>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   </div>
                 );
@@ -693,31 +706,96 @@ export default function DashboardPage() {
               </>
             )}
 
-            {/* Handed over (dimmed) */}
+            {/* Handed over */}
             {delivered.length > 0 && (
-              <div style={{ opacity: 0.45 }}>
-                <div style={{ fontSize: 11, color: C.textSub, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 11, color: C.textSub, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, opacity: 0.45 }}>
                   ✓ Handed Over ({delivered.length})
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {delivered.map((b) => (
-                    <div key={b.id} style={{
-                      background: C.card2, border: `1px solid ${C.border}`,
-                      borderRadius: 12, padding: "10px 14px",
-                      display: "flex", alignItems: "center", gap: 10,
-                    }}>
-                      <div style={{
-                        width: 28, height: 28, borderRadius: "50%",
-                        background: C.accentDim, border: `1px solid ${C.accentBorder}`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 13, color: C.accent, flexShrink: 0,
-                      }}>✓</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700 }}>{b.recipient_name}</div>
-                        <div style={{ fontSize: 11, color: C.textSub }}>{b.recipient_city} · {b.status}</div>
+                  {delivered.map((b) => {
+                    const isMailOp = b.collection_type === "operator_delivers" && b.status === "delivered";
+                    const mailingPending = isMailOp && b.mailing_fee_charged == null;
+                    const hasMailing = isMailOp && b.mailing_fee_charged != null;
+                    const currSym = b.currency === "USD" ? "$" : b.currency === "GBP" ? "£" : "€";
+                    const statusLabel = b.status === "delivered" && b.collection_type === "operator_delivers" ? "mailed" : b.status;
+                    return (
+                      <div key={b.id} style={{
+                        background: C.card2,
+                        border: `1px solid ${mailingPending ? C.goldBorder : C.border}`,
+                        borderRadius: 12, padding: "12px 14px",
+                        opacity: mailingPending ? 1 : 0.45,
+                        transition: "opacity 0.2s",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{
+                            width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+                            background: C.accentDim, border: `1px solid ${C.accentBorder}`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 13, color: C.accent,
+                          }}>✓</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>{b.recipient_name}</div>
+                            <div style={{ fontSize: 11, color: C.textSub }}>{b.recipient_city} · {statusLabel}</div>
+                          </div>
+                          {hasMailing && (
+                            <button
+                              onClick={() => togglePayment(b)}
+                              style={{
+                                background: b.payment_status === "paid" ? "rgba(0,212,160,0.12)" : "rgba(251,191,36,0.12)",
+                                border: `1px solid ${b.payment_status === "paid" ? C.accentBorder : C.goldBorder}`,
+                                borderRadius: 8, padding: "3px 8px",
+                                fontSize: 10, fontWeight: 700, flexShrink: 0,
+                                color: b.payment_status === "paid" ? C.accent : C.gold,
+                                cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                              }}
+                            >
+                              {b.payment_status === "paid" ? "✓ Paid" : "💰 Unpaid"}
+                            </button>
+                          )}
+                        </div>
+
+                        {mailingPending && (
+                          <div style={{ marginTop: 10 }}>
+                            <button
+                              onClick={() => setMailingBookingId(b.id)}
+                              style={{
+                                width: "100%",
+                                background: C.goldDim, border: `1px solid ${C.goldBorder}`,
+                                borderRadius: 10, padding: "10px 14px",
+                                color: C.gold, fontSize: 12, fontWeight: 800,
+                                cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                                display: "flex", alignItems: "center", justifyContent: "space-between",
+                              }}
+                            >
+                              <span>📬 Enter mailing cost</span>
+                              <span>→</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {hasMailing && (
+                          <div style={{
+                            marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 8,
+                            display: "flex", flexDirection: "column", gap: 3,
+                          }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.textSub }}>
+                              <span>📦 Cargo</span>
+                              <span>{b.confirmed_cost_display?.split(" ")[1] ? `${currSym}${b.confirmed_cost_display.split(" ")[1]}` : b.confirmed_cost_display}</span>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.textSub }}>
+                              <span>📬 Mailing (USPS/UPS)</span>
+                              <span>{currSym}{Number(b.mailing_fee_charged).toFixed(2)}</span>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 800, color: C.gold, borderTop: `1px solid ${C.border}`, paddingTop: 4, marginTop: 2 }}>
+                              <span>💰 Total</span>
+                              <span>{b.total_cost_usd != null ? `${currSym}${b.total_cost_usd.toFixed(2)}` : ""}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -796,6 +874,22 @@ export default function DashboardPage() {
           }}
         />
       )}
+
+      {mailingBookingId && trip && (() => {
+        const mb = bookings.find((b) => b.id === mailingBookingId);
+        return mb ? (
+          <MailingCostModal
+            booking={mb}
+            trip={trip}
+            onClose={() => setMailingBookingId(null)}
+            onSaved={(updated) => {
+              handleBookingUpdate(updated);
+              setMailingBookingId(null);
+              fire(`📬 Mailing cost saved for ${updated.recipient_name}`, C.gold);
+            }}
+          />
+        ) : null;
+      })()}
 
       <Toast toasts={toasts} onDismiss={dismiss} />
       <InstallPrompt />

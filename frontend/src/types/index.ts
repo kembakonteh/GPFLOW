@@ -233,6 +233,8 @@ export interface Booking {
   delivery_country?:       string;
   delivery_notes?:         string;
   mailing_fee_charged?:    number;
+  total_cost_minor?:       number;
+  total_cost_usd?:         number;
   trip_public_slug?:    string;
   trip_departure_date?: string;
   trip_direction?:      string;

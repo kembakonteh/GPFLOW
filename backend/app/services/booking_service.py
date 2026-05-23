@@ -13,9 +13,6 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal, ROUND_HALF_UP
 
-from app.utils.units import KG_TO_LB as _KG_TO_LB_FLOAT
-_KG_TO_LB = Decimal(str(_KG_TO_LB_FLOAT))
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -75,6 +72,18 @@ def _format_cost_display(minor: int | None, currency: str) -> str | None:
     if minor is None:
         return None
     return f"{currency} {minor / 100:.2f}"
+
+
+def _compute_totals(
+    confirmed_cost_minor: int | None,
+    mailing_fee_charged: Decimal | None,
+) -> dict:
+    """Return total_cost_minor and total_cost_usd, both None when cargo not yet confirmed."""
+    if confirmed_cost_minor is None:
+        return {"total_cost_minor": None, "total_cost_usd": None}
+    mailing_cents = int((mailing_fee_charged * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)) if mailing_fee_charged is not None else 0
+    total_minor = confirmed_cost_minor + mailing_cents
+    return {"total_cost_minor": total_minor, "total_cost_usd": total_minor / 100.0}
 
 
 # ── Query helpers ─────────────────────────────────────────────────────────────
@@ -151,6 +160,7 @@ def _to_booking_response(booking: Booking) -> BookingResponse:
         delivery_country=booking.delivery_country,
         delivery_notes=booking.delivery_notes,
         mailing_fee_charged=booking.mailing_fee_charged,
+        **_compute_totals(booking.confirmed_cost_minor, booking.mailing_fee_charged),
         created_at=booking.created_at,
         updated_at=booking.updated_at,
         trip_public_slug=trip.public_slug if trip else None,
@@ -365,6 +375,21 @@ async def update_payment_status(
     return await _refetch_booking(db, booking.id)
 
 
+async def update_mailing_fee(
+    db: AsyncSession,
+    booking_id: uuid.UUID,
+    operator_id: uuid.UUID,
+    mailing_fee_usd: Decimal,
+) -> Booking:
+    """Operator records the actual USPS/UPS mailing cost after delivery."""
+    booking = await _get_booking_or_404(db, booking_id, operator_id)
+    if booking.collection_type != CollectionType.operator_delivers:
+        raise validation_error("Mailing fee can only be set for operator_delivers bookings")
+    booking.mailing_fee_charged = mailing_fee_usd
+    await db.flush()
+    return await _refetch_booking(db, booking.id)
+
+
 async def update_booking_status(
     db: AsyncSession,
     booking: Booking,
@@ -436,16 +461,6 @@ async def process_weigh_in(
         if all(p.weight_kg is not None for p in booking.packages):
             if booking.status == BookingStatus.confirmed:
                 booking.status = BookingStatus.received
-            # Compute mailing fee now that full weight is known
-            if (
-                booking.collection_type == CollectionType.operator_delivers
-                and trip.domestic_mailing_rate_per_lb is not None
-                and booking.confirmed_weight_kg is not None
-            ):
-                total_lbs = Decimal(str(booking.confirmed_weight_kg)) * _KG_TO_LB
-                booking.mailing_fee_charged = (total_lbs * trip.domestic_mailing_rate_per_lb).quantize(
-                    Decimal("0.01"), rounding=ROUND_HALF_UP
-                )
 
     else:
         # ── Legacy path for bookings created before packages feature ──────
@@ -459,15 +474,6 @@ async def process_weigh_in(
         booking.status               = BookingStatus.received
         if body.payment_status is not None:
             booking.payment_status = body.payment_status
-        # Compute mailing fee now that full weight is known
-        if (
-            booking.collection_type == CollectionType.operator_delivers
-            and trip.domestic_mailing_rate_per_lb is not None
-        ):
-            total_lbs = Decimal(str(body.confirmed_weight_kg)) * _KG_TO_LB
-            booking.mailing_fee_charged = (total_lbs * trip.domestic_mailing_rate_per_lb).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
 
     await db.flush()
     return await _refetch_booking(db, booking.id)
