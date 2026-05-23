@@ -203,8 +203,8 @@ export default function BookingFormPage() {
           )}
         </div>
 
-        {/* Collection type toggle — always visible once trip is loaded */}
-        {trip && (
+        {/* Collection type toggle — inbound trips only */}
+        {trip && isInbound && (
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 10 }}>How would you like to receive it?</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -248,8 +248,8 @@ export default function BookingFormPage() {
           </div>
         )}
 
-        {/* Delivery address — shown when "Deliver to me" is selected */}
-        {showDelivery && (
+        {/* Delivery address — shown when "Deliver to me" is selected (inbound only) */}
+        {isInbound && showDelivery && (
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>🚚 Delivery Address</div>
             <div style={{ fontSize: 12, color: C.textSub, marginBottom: 14, lineHeight: 1.6 }}>
@@ -287,7 +287,7 @@ export default function BookingFormPage() {
         )}
 
         {/* Mailing fee notice */}
-        {showDelivery && (trip?.domestic_mailing_rate_per_lb ?? 0) > 0 && (
+        {isInbound && showDelivery && (trip?.domestic_mailing_rate_per_lb ?? 0) > 0 && (
           <div style={{
             background: C.goldDim, border: `1px solid ${C.goldBorder}`,
             borderRadius: 10, padding: "10px 14px",
