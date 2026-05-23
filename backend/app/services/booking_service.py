@@ -13,6 +13,9 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal, ROUND_HALF_UP
 
+from app.utils.units import KG_TO_LB as _KG_TO_LB_FLOAT
+_KG_TO_LB = Decimal(str(_KG_TO_LB_FLOAT))
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -246,13 +249,6 @@ async def create_booking(
     # Estimated cost
     estimated_minor = _calculate_cost_minor(body.estimated_weight_kg, trip.rate_per_kg)
 
-    # Snapshot mailing fee at booking time so it's preserved if trip fee changes later
-    mailing_fee = (
-        trip.domestic_mailing_fee
-        if body.collection_type == CollectionType.operator_delivers and trip.domestic_mailing_fee
-        else None
-    )
-
     ref = await _generate_reference_number(db)
 
     pkg_count = max(1, body.package_count)
@@ -282,7 +278,6 @@ async def create_booking(
         delivery_zip=body.delivery_zip,
         delivery_country=body.delivery_country,
         delivery_notes=body.delivery_notes,
-        mailing_fee_charged=mailing_fee,
     )
     db.add(booking)
     # Flush now so booking.id is populated by the DB before BookingPackage rows
@@ -441,6 +436,16 @@ async def process_weigh_in(
         if all(p.weight_kg is not None for p in booking.packages):
             if booking.status == BookingStatus.confirmed:
                 booking.status = BookingStatus.received
+            # Compute mailing fee now that full weight is known
+            if (
+                booking.collection_type == CollectionType.operator_delivers
+                and trip.domestic_mailing_rate_per_lb is not None
+                and booking.confirmed_weight_kg is not None
+            ):
+                total_lbs = Decimal(str(booking.confirmed_weight_kg)) * _KG_TO_LB
+                booking.mailing_fee_charged = (total_lbs * trip.domestic_mailing_rate_per_lb).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
 
     else:
         # ── Legacy path for bookings created before packages feature ──────
@@ -454,6 +459,15 @@ async def process_weigh_in(
         booking.status               = BookingStatus.received
         if body.payment_status is not None:
             booking.payment_status = body.payment_status
+        # Compute mailing fee now that full weight is known
+        if (
+            booking.collection_type == CollectionType.operator_delivers
+            and trip.domestic_mailing_rate_per_lb is not None
+        ):
+            total_lbs = Decimal(str(body.confirmed_weight_kg)) * _KG_TO_LB
+            booking.mailing_fee_charged = (total_lbs * trip.domestic_mailing_rate_per_lb).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
 
     await db.flush()
     return await _refetch_booking(db, booking.id)

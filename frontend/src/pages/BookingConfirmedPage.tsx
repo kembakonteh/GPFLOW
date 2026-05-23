@@ -166,7 +166,7 @@ export default function BookingConfirmedPage() {
               fontSize: 12, color: C.accent, display: "flex", gap: 8,
             }}>
               <span style={{ flexShrink: 0 }}>📬</span>
-              <span>Domestic mailing fee: <strong>${Number(booking.mailing_fee_charged).toFixed(2)}</strong></span>
+              <span>Mailing fee (USPS/UPS): <strong>${Number(booking.mailing_fee_charged).toFixed(2)}</strong></span>
             </div>
           )}
 

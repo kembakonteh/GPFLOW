@@ -124,7 +124,7 @@ export interface Trip {
   capacity_kg?:          number;
   accepted_item_types:   string[];
   customs_advisory?:     string;
-  domestic_mailing_fee?: number;
+  domestic_mailing_rate_per_lb?: number;
   public_slug:           string;
   view_count:            number;
   pickup_location?:      string;
@@ -288,7 +288,7 @@ export interface PublicTrip {
   spots_remaining?:      number;
   accepted_item_types:   string[];
   customs_advisory?:     string;
-  domestic_mailing_fee?: number;
+  domestic_mailing_rate_per_lb?: number;
   public_slug:           string;
   view_count:          number;
   pickup_location?:    string;

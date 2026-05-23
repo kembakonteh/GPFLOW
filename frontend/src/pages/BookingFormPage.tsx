@@ -240,9 +240,9 @@ export default function BookingFormPage() {
                   transition: "all 0.15s",
                 }}
               >
-                <span style={{ fontSize: 22 }}>🚚</span>
-                <span>Deliver to me</span>
-                <span style={{ fontSize: 10, opacity: 0.8, fontWeight: 400 }}>Operator drops it off</span>
+                <span style={{ fontSize: 22 }}>📬</span>
+                <span>Mail to me</span>
+                <span style={{ fontSize: 10, opacity: 0.8, fontWeight: 400 }}>Operator mails it via USPS/UPS</span>
               </button>
             </div>
           </div>
@@ -287,7 +287,7 @@ export default function BookingFormPage() {
         )}
 
         {/* Mailing fee notice */}
-        {showDelivery && (trip?.domestic_mailing_fee ?? 0) > 0 && (
+        {showDelivery && (trip?.domestic_mailing_rate_per_lb ?? 0) > 0 && (
           <div style={{
             background: C.goldDim, border: `1px solid ${C.goldBorder}`,
             borderRadius: 10, padding: "10px 14px",
@@ -295,7 +295,7 @@ export default function BookingFormPage() {
           }}>
             <span style={{ flexShrink: 0 }}>📬</span>
             <span>
-              A domestic mailing fee of <strong>${Number(trip!.domestic_mailing_fee).toFixed(2)}</strong> will be added to your total for home delivery.
+              Mailing fee will be calculated based on final package weight at <strong>${Number(trip!.domestic_mailing_rate_per_lb).toFixed(2)}/lb</strong> (USPS/UPS)
             </span>
           </div>
         )}

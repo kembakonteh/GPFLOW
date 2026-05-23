@@ -682,7 +682,7 @@ export default function DashboardPage() {
                               borderRadius: 6, padding: "2px 7px", marginTop: 4,
                               fontSize: 10, fontWeight: 700, color: C.textSub,
                             }}>
-                              🚚 Delivery · {b.delivery_city || b.delivery_address_line1}
+                              📬 Mail to · {b.delivery_city || b.delivery_address_line1}
                             </div>
                           )}
                         </div>

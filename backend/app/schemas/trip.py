@@ -44,7 +44,7 @@ class TripCreate(BaseModel):
     capacity_kg:         Decimal | None = Field(None, gt=0)
     accepted_item_types:  list[str]                = []
     customs_advisory:     str | None               = None
-    domestic_mailing_fee: Decimal | None           = None
+    domestic_mailing_rate_per_lb: Decimal | None           = None
     drop_off_locations:   list[DropoffLocationCreate] = []
 
     @model_validator(mode="after")
@@ -77,7 +77,7 @@ class TripUpdate(BaseModel):
     capacity_kg:         Decimal | None       = None   # None means "clear"
     accepted_item_types:  list[str] | None                = None
     customs_advisory:     str | None                      = None
-    domestic_mailing_fee: Decimal | None                  = None
+    domestic_mailing_rate_per_lb: Decimal | None                  = None
     status:               TripStatus | None               = None
     drop_off_locations:   list[DropoffLocationCreate] | None = None
 
@@ -117,7 +117,7 @@ class TripResponse(BaseModel):
     capacity_kg:          Decimal | None
     accepted_item_types:  list
     customs_advisory:     str | None
-    domestic_mailing_fee: Decimal | None
+    domestic_mailing_rate_per_lb: Decimal | None
     public_slug:          str
     view_count:           int
     pickup_location:     str | None
@@ -154,7 +154,7 @@ class PublicTripResponse(BaseModel):
     spots_remaining:      int | None   # None when capacity not set
     accepted_item_types:  list
     customs_advisory:     str | None
-    domestic_mailing_fee: Decimal | None = None
+    domestic_mailing_rate_per_lb: Decimal | None = None
     public_slug:          str
     view_count:          int
     pickup_location:     str | None

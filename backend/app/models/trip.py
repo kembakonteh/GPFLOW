@@ -81,8 +81,8 @@ class Trip(Base):
     accepted_item_types: Mapped[list] = mapped_column(
         JSONB, nullable=False, default=list, server_default="'[]'::jsonb"
     )
-    customs_advisory:      Mapped[str | None]     = mapped_column(Text)
-    domestic_mailing_fee:  Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    customs_advisory:                Mapped[str | None]     = mapped_column(Text)
+    domestic_mailing_rate_per_lb:    Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
 
     # Public identity
     public_slug: Mapped[str]  = mapped_column(String(120), unique=True, nullable=False)

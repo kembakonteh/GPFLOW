@@ -69,7 +69,7 @@ def _to_trip_response_dict(trip: Trip, booking_counts: dict | None = None) -> di
         "capacity_kg":         trip.capacity_kg,
         "accepted_item_types":  trip.accepted_item_types,
         "customs_advisory":     trip.customs_advisory,
-        "domestic_mailing_fee": trip.domestic_mailing_fee,
+        "domestic_mailing_rate_per_lb": trip.domestic_mailing_rate_per_lb,
         "public_slug":          trip.public_slug,
         "view_count":          trip.view_count,
         "pickup_location":     trip.pickup_location,
@@ -137,7 +137,7 @@ async def create_trip(
         capacity_kg=data.capacity_kg,
         accepted_item_types=data.accepted_item_types,
         customs_advisory=data.customs_advisory,
-        domestic_mailing_fee=data.domestic_mailing_fee,
+        domestic_mailing_rate_per_lb=data.domestic_mailing_rate_per_lb,
         public_slug=slug,
     )
     db.add(trip)
