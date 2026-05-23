@@ -29,6 +29,13 @@ export default function ArrivedModal({ trip, bookings, onClose, onArrived }: Pro
   const dest    = `${trip.destination_city}, ${trip.destination_country}`;
   const op      = trip.operator_business_name;
 
+  const isInbound = trip.direction === "inbound" ||
+    trip.destination_country?.toUpperCase() === "US" ||
+    trip.destination_country?.toUpperCase() === "GB";
+  const destFlag = isInbound
+    ? (trip.destination_country?.toUpperCase() === "GB" ? "🇬🇧" : "🇺🇸")
+    : "🇬🇲";
+
   const fromFmt = dateFrom
     ? new Date(dateFrom).toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : "";
@@ -40,7 +47,7 @@ export default function ArrivedModal({ trip, bookings, onClose, onArrived }: Pro
   function buildMsg(b: Booking): string {
     const fn = b.sender_name.split(" ")[0];
     return (
-      `Hi ${fn} 👋\n\nAlhamdulillah, landed in ${dest}! 🇬🇲\n` +
+      `Hi ${fn} 👋\n\nAlhamdulillah, landed in ${dest}! ${destFlag}\n` +
       `Your package for ${b.recipient_name} is ready.\n\n` +
       `📍 ${location}\n` +
       `📅 ${dateRange} · ${hours} daily\n` +
@@ -92,7 +99,7 @@ export default function ArrivedModal({ trip, bookings, onClose, onArrived }: Pro
         {step === "form" && (
           <>
             <div style={{ paddingRight: 40, marginBottom: 18 }}>
-              <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🇬🇲 We've Arrived!</div>
+              <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>{destFlag} We've Arrived!</div>
               <div style={{ fontSize: 12, color: C.textSub }}>
                 Set pickup details, then choose whether to notify customers.
               </div>
@@ -104,7 +111,7 @@ export default function ArrivedModal({ trip, bookings, onClose, onArrived }: Pro
                 <input
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  placeholder="e.g. 14 Kairaba Avenue, Serrekunda"
+                  placeholder={isInbound ? "e.g. 123 Main St, Seattle, WA" : "e.g. 14 Kairaba Avenue, Serrekunda"}
                   style={inp}
                 />
               </div>
@@ -165,7 +172,7 @@ export default function ArrivedModal({ trip, bookings, onClose, onArrived }: Pro
                 display: "flex", alignItems: "center", justifyContent: "space-between",
               }}
             >
-              <span>{loading ? "Confirming…" : "🇬🇲 Confirm Arrival"}</span>
+              <span>{loading ? "Confirming…" : `${destFlag} Confirm Arrival`}</span>
               {!loading && <span>→</span>}
             </button>
           </>
