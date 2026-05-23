@@ -629,6 +629,14 @@ export default function DashboardPage() {
                         const costDisplay = hasMailing && b.total_cost_usd != null
                           ? `${currSym}${b.total_cost_usd.toFixed(2)}`
                           : b.confirmed_cost_display ?? "";
+                        const senderFirst = b.sender_name.split(" ")[0];
+                        const trackUrl    = `${window.location.origin}/track/${b.reference_number}`;
+                        const op          = trip?.operator_business_name ?? "";
+                        const waMsg       = b.package_count > 1 && b.packages.length > 0
+                          ? `Hi ${senderFirst} 👋\n\nYour packages are checked in with ${op}.\n\n📦 Packages:\n${b.packages.map((p) => `${p.package_reference} · ${p.weight_kg != null ? (Number(p.weight_kg) * KG_TO_LB).toFixed(1) : "pending"} lbs`).join("\n")}\n\nBooking ref: ${b.reference_number}\n💰 Total cost: ${costDisplay}\n✈️ Departing: ${trip?.departure_date ?? ""}\n\nTrack your packages: ${trackUrl}\n\nThank you 🙏 — ${op} via GPFLOW`
+                          : `Hi ${senderFirst} 👋\n\nYour package is checked in with ${op}.\n\n📦 Ref: ${b.reference_number}\n🏋️ Weight: ${lbs ?? ""}lbs\n💰 Cost: ${costDisplay}\n✈️ Departing: ${trip?.departure_date ?? ""}\n\nTrack your package: ${trackUrl}\n\nThank you 🙏 — ${op} via GPFLOW`;
+                        const waPhone     = b.sender_phone?.replace(/\D/g, "") ?? "";
+                        const waTrackHref = `https://wa.me/${waPhone}?text=${encodeURIComponent(waMsg)}`;
                         return (
                           <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
                             <div style={{ fontSize: 13, fontWeight: 700, color: C.accent }}>{costDisplay}</div>
@@ -648,6 +656,21 @@ export default function DashboardPage() {
                             >
                               {b.payment_status === "paid" ? "✓ Paid" : "💰 Unpaid"}
                             </button>
+                            <a
+                              href={waTrackHref}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: "flex", alignItems: "center", gap: 4,
+                                background: "rgba(37,211,102,0.1)",
+                                border: "1px solid rgba(37,211,102,0.3)",
+                                borderRadius: 8, padding: "3px 8px",
+                                fontSize: 10, fontWeight: 700, color: "#25D366",
+                                textDecoration: "none",
+                              }}
+                            >
+                              📲 Send Tracking
+                            </a>
                             {isMailOp && !hasMailing && (
                               <div style={{ fontSize: 9, color: C.gold, fontWeight: 700 }}>⚠️ Mailing TBD</div>
                             )}
