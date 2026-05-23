@@ -182,8 +182,8 @@ export default function BookingFormPage() {
               )}
             </div>
             <div>
-              <label style={lbl}>City in Gambia</label>
-              <input value={recipientCity} onChange={(e) => setRecipientCity(e.target.value)} placeholder="Serrekunda" style={inp} />
+              <label style={lbl}>{isInbound ? "Recipient City (US)" : "City in Gambia"}</label>
+              <input value={recipientCity} onChange={(e) => setRecipientCity(e.target.value)} placeholder={isInbound ? "e.g. Seattle" : "e.g. Serrekunda"} style={inp} />
             </div>
           </div>
         </div>

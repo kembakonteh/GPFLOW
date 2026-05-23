@@ -71,6 +71,10 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
     }
   }
 
+  const isInbound = trip.direction === "inbound" ||
+    trip.destination_country?.toUpperCase() === "US" ||
+    trip.destination_country?.toUpperCase() === "GB";
+
   const cutoff = new Date(trip.cutoff_date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
   if (weighing) {
@@ -339,8 +343,8 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
                   <input value={waRecipient} onChange={(e) => setWaRecipient(e.target.value)} placeholder="Lamin Camara" style={inpStyle} />
                 </div>
                 <div>
-                  <label style={lblStyle}>City</label>
-                  <input value={waCity} onChange={(e) => setWaCity(e.target.value)} placeholder="Serrekunda" style={inpStyle} />
+                  <label style={lblStyle}>{isInbound ? "Recipient City (US)" : "City in Gambia"}</label>
+                  <input value={waCity} onChange={(e) => setWaCity(e.target.value)} placeholder={isInbound ? "e.g. Seattle" : "e.g. Serrekunda"} style={inpStyle} />
                 </div>
               </div>
 
