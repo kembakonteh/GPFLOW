@@ -23,11 +23,18 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
   const [loading, setLoading] = useState(false);
 
   // Walk-in form
-  const [waSender, setWaSender] = useState("");
-  const [waPhone, setWaPhone] = useState("");
-  const [waRecipient, setWaRecipient] = useState("");
-  const [waCity, setWaCity] = useState("");
-  const [waItems, setWaItems] = useState("");
+  const [waSender, setWaSender]               = useState("");
+  const [waPhone, setWaPhone]                 = useState("");
+  const [waRecipient, setWaRecipient]         = useState("");
+  const [waCity, setWaCity]                   = useState("");
+  const [waItems, setWaItems]                 = useState("");
+  const [waCollectionType, setWaCollectionType] = useState<"self_collect" | "operator_delivers">("self_collect");
+  const [waDeliveryLine1, setWaDeliveryLine1] = useState("");
+  const [waDeliveryLine2, setWaDeliveryLine2] = useState("");
+  const [waDeliveryCity, setWaDeliveryCity]   = useState("");
+  const [waDeliveryState, setWaDeliveryState] = useState("");
+  const [waDeliveryZip, setWaDeliveryZip]     = useState("");
+  const [waDeliveryNotes, setWaDeliveryNotes] = useState("");
 
   const isFullyWeighed = (b: Booking) => {
     if (b.packages && b.packages.length > 0) return b.packages.every((p) => p.weight_kg != null);
@@ -46,12 +53,21 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
       )
     : pending;
 
+  const isInbound = trip.direction === "inbound" ||
+    trip.destination_country?.toUpperCase() === "US" ||
+    trip.destination_country?.toUpperCase() === "GB";
+
+  const waMailing = isInbound && waCollectionType === "operator_delivers";
+  const canSubmitWalkin = !!(
+    waSender && waPhone && waRecipient && waCity && waItems && !loading &&
+    (!waMailing || (waDeliveryLine1 && waDeliveryCity && waDeliveryState && waDeliveryZip))
+  );
+
   async function submitWalkin() {
-    if (!waSender || !waPhone || !waRecipient || !waCity || !waItems || loading) return;
+    if (!canSubmitWalkin) return;
     setLoading(true);
     try {
-      // Step 1: create booking via public endpoint
-      const { data: created } = await api.post<{ id: string }>("/bookings", {
+      const payload: Record<string, unknown> = {
         trip_id: trip.id,
         sender_name: waSender,
         sender_phone: waPhone,
@@ -60,7 +76,21 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
         item_description: waItems,
         quantity: 1,
         estimated_weight_kg: 0,
-      });
+      };
+      if (isInbound) {
+        payload.collection_type = waCollectionType;
+        if (waMailing) {
+          payload.delivery_address_line1 = waDeliveryLine1;
+          if (waDeliveryLine2) payload.delivery_address_line2 = waDeliveryLine2;
+          payload.delivery_city    = waDeliveryCity;
+          payload.delivery_state   = waDeliveryState;
+          payload.delivery_zip     = waDeliveryZip;
+          payload.delivery_country = "US";
+          if (waDeliveryNotes) payload.delivery_notes = waDeliveryNotes;
+        }
+      }
+      // Step 1: create booking via public endpoint
+      const { data: created } = await api.post<{ id: string }>("/bookings", payload);
       // Step 2: fetch the full operator booking (all fields WeighModal needs)
       const { data: full } = await api.get<Booking>(`/bookings/${created.id}`);
       onBookingUpdate(full);
@@ -70,10 +100,6 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
       setLoading(false);
     }
   }
-
-  const isInbound = trip.direction === "inbound" ||
-    trip.destination_country?.toUpperCase() === "US" ||
-    trip.destination_country?.toUpperCase() === "GB";
 
   const cutoff = new Date(trip.cutoff_date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
@@ -326,16 +352,91 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
               <div style={{ fontSize: 12, color: C.textSub, marginBottom: 20 }}>No prior booking — add details now</div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {[
-                { label: "Sender Name", val: waSender, set: setWaSender, placeholder: "e.g. Fatou Camara" },
-                { label: "WhatsApp Number", val: waPhone, set: setWaPhone, placeholder: "+1 206 555 0142" },
-              ].map(({ label, val, set, placeholder }) => (
-                <div key={label}>
-                  <label style={lblStyle}>{label}</label>
-                  <input value={val} onChange={(e) => set(e.target.value)} placeholder={placeholder} style={inpStyle} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: "60vh", overflowY: "auto", paddingBottom: 4 }}>
+              <div>
+                <label style={lblStyle}>Sender Name</label>
+                <input value={waSender} onChange={(e) => setWaSender(e.target.value)} placeholder="e.g. Fatou Camara" style={inpStyle} />
+              </div>
+
+              <div>
+                <label style={lblStyle}>WhatsApp Number</label>
+                <input value={waPhone} onChange={(e) => setWaPhone(e.target.value)} placeholder="+1 206 555 0142" style={inpStyle} />
+              </div>
+
+              {/* Collection type selector — inbound trips only */}
+              {isInbound && (
+                <div>
+                  <label style={lblStyle}>How will they receive it?</label>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    {([
+                      { value: "self_collect" as const, emoji: "📍", title: "Self-collect", sub: "I'll pick it up", color: C.teal, dimColor: C.tealDim, borderColor: C.tealBorder },
+                      { value: "operator_delivers" as const, emoji: "📬", title: "Mail to me", sub: "Operator mails via USPS/UPS", color: C.accent, dimColor: C.accentDim, borderColor: C.accentBorder },
+                    ] as const).map(({ value, emoji, title, sub, color, dimColor, borderColor }) => {
+                      const active = waCollectionType === value;
+                      return (
+                        <button
+                          key={value}
+                          onClick={() => setWaCollectionType(value)}
+                          style={{
+                            background: active ? dimColor : C.card2,
+                            border: `1px solid ${active ? borderColor : C.border}`,
+                            borderRadius: 12, padding: "14px 10px",
+                            display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                            cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                          }}
+                        >
+                          <span style={{ fontSize: 20 }}>{emoji}</span>
+                          <span style={{ fontSize: 13, fontWeight: 800, color: active ? color : C.text }}>{title}</span>
+                          <span style={{ fontSize: 10, color: C.textSub, textAlign: "center" }}>{sub}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              ))}
+              )}
+
+              {/* Delivery address — inbound + Mail to me */}
+              {waMailing && (
+                <div style={{
+                  background: C.accentDim, border: `1px solid ${C.accentBorder}`,
+                  borderRadius: 14, padding: "14px",
+                  display: "flex", flexDirection: "column", gap: 12,
+                }}>
+                  <div style={{ fontSize: 11, color: C.accent, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    📬 Mailing Address
+                  </div>
+
+                  <div>
+                    <label style={lblStyle}>Street Address *</label>
+                    <input value={waDeliveryLine1} onChange={(e) => setWaDeliveryLine1(e.target.value)} placeholder="e.g. 123 Main St" style={inpStyle} />
+                  </div>
+
+                  <div>
+                    <label style={lblStyle}>Apt / Suite</label>
+                    <input value={waDeliveryLine2} onChange={(e) => setWaDeliveryLine2(e.target.value)} placeholder="e.g. Apt 4B (optional)" style={inpStyle} />
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
+                    <div>
+                      <label style={lblStyle}>City *</label>
+                      <input value={waDeliveryCity} onChange={(e) => setWaDeliveryCity(e.target.value)} placeholder="Seattle" style={inpStyle} />
+                    </div>
+                    <div>
+                      <label style={lblStyle}>State *</label>
+                      <input value={waDeliveryState} onChange={(e) => setWaDeliveryState(e.target.value)} placeholder="WA" style={inpStyle} />
+                    </div>
+                    <div>
+                      <label style={lblStyle}>ZIP *</label>
+                      <input value={waDeliveryZip} onChange={(e) => setWaDeliveryZip(e.target.value)} placeholder="98101" style={inpStyle} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={lblStyle}>Delivery Notes</label>
+                    <input value={waDeliveryNotes} onChange={(e) => setWaDeliveryNotes(e.target.value)} placeholder="e.g. Ring doorbell, leave at door (optional)" style={inpStyle} />
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
@@ -355,14 +456,15 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
 
               <button
                 onClick={submitWalkin}
-                disabled={!waSender || !waPhone || !waRecipient || !waCity || !waItems || loading}
+                disabled={!canSubmitWalkin}
                 style={{
                   width: "100%",
-                  background: (waSender && waPhone && waRecipient && waCity && waItems && !loading) ? C.gold : C.border,
-                  color: (waSender && waPhone && waRecipient && waCity && waItems && !loading) ? "#07090F" : C.textDim,
+                  background: canSubmitWalkin ? C.gold : C.border,
+                  color: canSubmitWalkin ? "#07090F" : C.textDim,
                   border: "none", borderRadius: 16,
                   padding: "16px 20px", fontSize: 15, fontWeight: 900,
-                  cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                  cursor: canSubmitWalkin ? "pointer" : "not-allowed",
+                  fontFamily: "'DM Sans',sans-serif",
                   display: "flex", alignItems: "center", justifyContent: "space-between",
                   marginTop: 4,
                 }}
