@@ -791,7 +791,7 @@ export default function DashboardPage() {
           onClose={closeModal}
           onDelivered={(b) => {
             handleBookingUpdate(b);
-            fire(`${b.status === "delivered" ? "✅ Delivered!" : "🤝 Collected!"} WhatsApp sent.`, b.status === "delivered" ? C.accent : C.teal);
+            fire(`${b.status === "delivered" ? (b.collection_type === "operator_delivers" ? "📬 Mailed!" : "✅ Delivered!") : "🤝 Collected!"} WhatsApp sent.`, b.status === "delivered" ? C.accent : C.teal);
             refetchBookings();
           }}
         />
@@ -910,7 +910,7 @@ function ReportOverlay({
                       borderRadius: 8, padding: "2px 8px",
                       fontSize: 10, fontWeight: 700,
                       color: b.status === "delivered" ? C.accent : C.textSub,
-                    }}>{b.status}</span>
+                    }}>{b.status === "delivered" && b.collection_type === "operator_delivers" ? "mailed" : b.status}</span>
                   </td>
                 </tr>
               );

@@ -52,10 +52,16 @@ export default function ScanModal({ trip, bookings, onClose, onDelivered }: Prop
 
   function buildDoneMsg(b: Booking, act: Action): string {
     const senderFirst = b.sender_name.split(" ")[0];
-    const emoji = act === "collected" ? "🤝" : "✅";
+    const isMailed = act === "delivered" && b.collection_type === "operator_delivers";
+    const emoji = act === "collected" ? "🤝" : isMailed ? "📬" : "✅";
+    const handoverText = act === "collected"
+      ? `${b.recipient_name} collected`
+      : isMailed
+        ? `Mailed to ${b.recipient_name}`
+        : `Delivered to ${b.recipient_name}`;
     return (
       `Hi ${senderFirst} 👋\n\n` +
-      `${emoji} ${act === "collected" ? `${b.recipient_name} collected` : `Delivered to ${b.recipient_name}`} in ${b.recipient_city}!\n\n` +
+      `${emoji} ${handoverText} in ${b.recipient_city}!\n\n` +
       `Ref: ${b.reference_number}\n` +
       `Thank you 🙏 — ${op} via GPFLOW`
     );
@@ -176,9 +182,9 @@ export default function ScanModal({ trip, bookings, onClose, onDelivered }: Prop
                               opacity: loading ? 0.6 : 1,
                             }}
                           >
-                            <span style={{ fontSize: 22 }}>✅</span>
-                            <span>Delivered</span>
-                            <span style={{ fontSize: 10, opacity: 0.8 }}>We dropped it off</span>
+                            <span style={{ fontSize: 22 }}>{b.collection_type === "operator_delivers" ? "📬" : "✅"}</span>
+                            <span>{b.collection_type === "operator_delivers" ? "Mailed" : "Delivered"}</span>
+                            <span style={{ fontSize: 10, opacity: 0.8 }}>{b.collection_type === "operator_delivers" ? "Sent via USPS/UPS" : "We dropped it off"}</span>
                           </button>
                         </div>
                         {/* Hold over — recipient didn't show up */}
@@ -212,13 +218,13 @@ export default function ScanModal({ trip, bookings, onClose, onDelivered }: Prop
         {step === "done" && selected && action && (
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 56, marginBottom: 14 }}>
-              {action === "collected" ? "🤝" : action === "delivered" ? "✅" : "📦"}
+              {action === "collected" ? "🤝" : action === "delivered" ? (selected.collection_type === "operator_delivers" ? "📬" : "✅") : "📦"}
             </div>
             <div style={{
               fontSize: 22, fontWeight: 800, marginBottom: 6,
               color: action === "collected" ? C.teal : action === "delivered" ? C.accent : C.textSub,
             }}>
-              {action === "collected" ? "Collected!" : action === "delivered" ? "Delivered!" : "Held Over"}
+              {action === "collected" ? "Collected!" : action === "delivered" ? (selected.collection_type === "operator_delivers" ? "Mailed!" : "Delivered!") : "Held Over"}
             </div>
             <div style={{ fontSize: 13, color: C.textSub, marginBottom: 6 }}>
               {selected.recipient_name} · {selected.recipient_city}
@@ -230,7 +236,7 @@ export default function ScanModal({ trip, bookings, onClose, onDelivered }: Prop
                 borderRadius: 8, padding: "4px 12px", marginBottom: 14,
                 fontSize: 12, fontWeight: 700, color: C.accent,
               }}>
-                ✓ All {selected.package_count} packages {action === "held" ? "held" : action}
+                ✓ All {selected.package_count} packages {action === "held" ? "held" : action === "delivered" && selected.collection_type === "operator_delivers" ? "mailed" : action}
               </div>
             )}
             {selected.package_count === 1 && <div style={{ marginBottom: 14 }} />}
