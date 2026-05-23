@@ -395,25 +395,27 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
               )}
             </div>
 
-            {/* Mailing rate */}
-            <div style={{ textAlign: "left", marginBottom: 20 }}>
-              <label style={lbl}>Mailing Rate (USD per lb) — optional</label>
-              <div style={{ fontSize: 11, color: C.textSub, marginBottom: 6 }}>
-                Per-lb rate charged for USPS/UPS mailing to out-of-state customers
+            {/* Mailing rate — inbound only */}
+            {direction === "inbound" && (
+              <div style={{ textAlign: "left", marginBottom: 20 }}>
+                <label style={lbl}>Mailing Rate (USD per lb) — optional</label>
+                <div style={{ fontSize: 11, color: C.textSub, marginBottom: 6 }}>
+                  Per-lb rate charged for USPS/UPS mailing to out-of-state customers
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16, color: C.textSub, fontWeight: 700 }}>$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={mailingRate}
+                    onChange={(e) => setMailingRate(e.target.value)}
+                    placeholder="e.g. 0.50"
+                    style={{ ...inp, width: "100%" }}
+                  />
+                </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 16, color: C.textSub, fontWeight: 700 }}>$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={mailingRate}
-                  onChange={(e) => setMailingRate(e.target.value)}
-                  placeholder="e.g. 0.50"
-                  style={{ ...inp, width: "100%" }}
-                />
-              </div>
-            </div>
+            )}
 
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setStep(1)} style={backBtn}>← Back</button>
