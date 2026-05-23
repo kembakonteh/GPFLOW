@@ -143,7 +143,7 @@ export default function BookingFormPage() {
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 15, fontWeight: 800, marginBottom: isInbound ? 4 : 16 }}>Your details</div>
           {isInbound && (
-            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 16 }}>Your contact info as the receiver in the US</div>
+            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 16 }}>Your info as the sender in Gambia</div>
           )}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
@@ -166,19 +166,19 @@ export default function BookingFormPage() {
         {/* Who is this for */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 16 }}>
-            {isInbound ? "Who is sending this?" : "Who is this for?"}
+            Who is this for?
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label style={lbl}>{isInbound ? "Sender Name" : "Recipient Name"}</label>
+              <label style={lbl}>{isInbound ? "Receiver Name" : "Recipient Name"}</label>
               <input
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
-                placeholder={isInbound ? "e.g. Fatou Camara" : "Lamin Camara"}
+                placeholder={isInbound ? "e.g. Lamin Camara" : "Lamin Camara"}
                 style={inp}
               />
               {isInbound && (
-                <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>The person dropping off the package in Gambia</div>
+                <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>The person receiving the package in the US</div>
               )}
             </div>
             <div>
