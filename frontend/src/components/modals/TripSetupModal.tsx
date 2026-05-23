@@ -252,20 +252,27 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
 
               {/* Drop-off Locations */}
               <div>
-                <label style={lbl}>Drop-off Locations (optional)</label>
+                <label style={lbl}>
+                  {direction === "inbound" ? "Drop-off Locations in Gambia" : "Drop-off Locations (optional)"}
+                </label>
+                {direction === "inbound" && (
+                  <div style={{ fontSize: 11, color: C.textSub, marginBottom: 8 }}>
+                    Where senders can drop off packages in Gambia
+                  </div>
+                )}
                 {dropoffLocs.map((loc, idx) => (
                   <div key={idx} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-start" }}>
                     <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
                       <input
                         value={loc.label}
                         onChange={(e) => updateDropoffLoc(idx, "label", e.target.value)}
-                        placeholder="e.g. African Supermart – Lynnwood"
+                        placeholder={direction === "inbound" ? "e.g. Bakau, Banjul" : "e.g. African Supermart – Lynnwood"}
                         style={inp}
                       />
                       <input
                         value={loc.address}
                         onChange={(e) => updateDropoffLoc(idx, "address", e.target.value)}
-                        placeholder="Address (optional)"
+                        placeholder={direction === "inbound" ? "Full address (optional)" : "Address (optional)"}
                         style={{ ...inp, fontSize: 12, padding: "9px 14px" }}
                       />
                     </div>
