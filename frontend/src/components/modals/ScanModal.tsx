@@ -22,6 +22,8 @@ export default function ScanModal({ trip, bookings, onClose, onDelivered }: Prop
   const [selected, setSelected] = useState<Booking | null>(null);
   const [action, setAction]   = useState<Action | null>(null);
   const [loading, setLoading] = useState(false);
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [localPaid, setLocalPaid] = useState<Set<string>>(new Set());
 
   const pending = bookings.filter((b) => !["collected", "delivered", "held"].includes(b.status));
   const q = search.toLowerCase().trim();
@@ -36,6 +38,18 @@ export default function ScanModal({ trip, bookings, onClose, onDelivered }: Prop
     : pending;
 
   const op = trip.operator_business_name;
+
+  async function markPaid(bookingId: string) {
+    setPayingId(bookingId);
+    try {
+      await api.patch(`/bookings/${bookingId}/payment`, { payment_status: "paid" });
+      setLocalPaid((prev) => new Set([...prev, bookingId]));
+    } catch {
+      // silent — payment row stays amber
+    } finally {
+      setPayingId(null);
+    }
+  }
 
   async function confirm(act: Action) {
     if (!selected || loading) return;
@@ -143,70 +157,132 @@ export default function ScanModal({ trip, bookings, onClose, onDelivered }: Prop
                       </div>
                     </div>
 
-                    {/* Inline confirm buttons — only show for selected */}
-                    {isSel && (
-                      <div style={{
-                        background: C.card, border: `1px solid ${C.teal}`,
-                        borderTop: "none", borderRadius: "0 0 14px 14px",
-                        padding: "14px 14px 14px",
-                      }}>
-                        <div style={{ fontSize: 11, color: C.textSub, marginBottom: 10, textAlign: "center" }}>
-                          How was this package handed over?
-                        </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 8 }}>
+                    {/* Inline confirm panel — only show for selected */}
+                    {isSel && (() => {
+                      const isPaid = b.payment_status === "paid" || localPaid.has(b.id);
+                      const amt = b.total_cost_usd ?? (
+                        b.confirmed_cost_display?.split(" ")[1]
+                          ? parseFloat(b.confirmed_cost_display.split(" ")[1])
+                          : null
+                      );
+                      const currSym = b.currency === "USD" ? "$" : b.currency === "GBP" ? "£" : "€";
+                      const amtStr = amt != null ? `${currSym}${amt.toFixed(2)}` : "";
+                      const mailingMissing = b.collection_type === "operator_delivers" && b.mailing_fee_charged == null;
+                      const blocked = loading || !isPaid;
+                      return (
+                        <div style={{
+                          background: C.card, border: `1px solid ${C.teal}`,
+                          borderTop: "none", borderRadius: "0 0 14px 14px",
+                          padding: "12px 14px 14px",
+                        }}>
+                          {/* Payment status row */}
+                          <div style={{
+                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                            padding: "9px 12px", borderRadius: 10, marginBottom: 8,
+                            background: isPaid ? C.accentDim : "rgba(251,191,36,0.1)",
+                            border: `1px solid ${isPaid ? C.accentBorder : C.goldBorder}`,
+                          }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: isPaid ? C.accent : C.gold }}>
+                              {isPaid
+                                ? `✓${amtStr ? ` ${amtStr}` : ""} paid`
+                                : `⚠️${amtStr ? ` ${amtStr}` : ""} not received`}
+                            </span>
+                            {!isPaid && (
+                              <button
+                                onClick={() => markPaid(b.id)}
+                                disabled={payingId === b.id}
+                                style={{
+                                  background: C.accent, border: "none", borderRadius: 8,
+                                  padding: "5px 12px",
+                                  color: "#07090F", fontSize: 11, fontWeight: 800,
+                                  cursor: payingId === b.id ? "not-allowed" : "pointer",
+                                  fontFamily: "'DM Sans',sans-serif",
+                                  opacity: payingId === b.id ? 0.6 : 1,
+                                }}
+                              >
+                                {payingId === b.id ? "…" : "Mark as Paid"}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Mailing cost missing — informational only, doesn't block */}
+                          {mailingMissing && (
+                            <div style={{ fontSize: 11, color: C.gold, textAlign: "center", marginBottom: 8 }}>
+                              ⚠️ Mailing cost not yet entered
+                            </div>
+                          )}
+
+                          <div style={{ fontSize: 11, color: C.textSub, marginBottom: 10, textAlign: "center" }}>
+                            {!isPaid ? "Mark as paid to confirm handover" : "How was this package handed over?"}
+                          </div>
+
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 8 }}>
+                            <button
+                              onClick={() => confirm("collected")}
+                              disabled={blocked}
+                              style={{
+                                background: blocked ? C.card2 : C.teal,
+                                border: `1px solid ${blocked ? C.border : "transparent"}`,
+                                borderRadius: 12, padding: "14px 10px",
+                                color: blocked ? C.textDim : "#07090F",
+                                fontSize: 13, fontWeight: 800,
+                                cursor: blocked ? "not-allowed" : "pointer",
+                                display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                                fontFamily: "'DM Sans',sans-serif",
+                                opacity: blocked ? 0.55 : 1,
+                              }}
+                            >
+                              <span style={{ fontSize: 22 }}>🤝</span>
+                              <span>Collected</span>
+                              <span style={{ fontSize: 10, opacity: 0.8 }}>
+                                {!isPaid ? "Mark as paid first" : "They picked it up"}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => confirm("delivered")}
+                              disabled={blocked}
+                              style={{
+                                background: blocked ? C.card2 : C.accent,
+                                border: `1px solid ${blocked ? C.border : "transparent"}`,
+                                borderRadius: 12, padding: "14px 10px",
+                                color: blocked ? C.textDim : "#07090F",
+                                fontSize: 13, fontWeight: 800,
+                                cursor: blocked ? "not-allowed" : "pointer",
+                                display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                                fontFamily: "'DM Sans',sans-serif",
+                                opacity: blocked ? 0.55 : 1,
+                              }}
+                            >
+                              <span style={{ fontSize: 22 }}>{b.collection_type === "operator_delivers" ? "📬" : "✅"}</span>
+                              <span>{b.collection_type === "operator_delivers" ? "Mailed" : "Delivered"}</span>
+                              <span style={{ fontSize: 10, opacity: 0.8 }}>
+                                {!isPaid ? "Mark as paid first" : b.collection_type === "operator_delivers" ? "Sent via USPS/UPS" : "We dropped it off"}
+                              </span>
+                            </button>
+                          </div>
+
+                          {/* Hold — never blocked by payment */}
                           <button
-                            onClick={() => confirm("collected")}
+                            onClick={() => confirm("held")}
                             disabled={loading}
                             style={{
-                              background: C.teal, border: "none", borderRadius: 12,
-                              padding: "14px 10px", color: "#07090F",
-                              fontSize: 13, fontWeight: 800, cursor: "pointer",
-                              display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                              width: "100%",
+                              background: "transparent",
+                              border: `1px solid ${C.border}`,
+                              borderRadius: 12, padding: "11px 14px",
+                              color: C.textSub, fontSize: 12, fontWeight: 700,
+                              cursor: loading ? "not-allowed" : "pointer",
                               fontFamily: "'DM Sans',sans-serif",
+                              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                               opacity: loading ? 0.6 : 1,
                             }}
                           >
-                            <span style={{ fontSize: 22 }}>🤝</span>
-                            <span>Collected</span>
-                            <span style={{ fontSize: 10, opacity: 0.8 }}>They picked it up</span>
-                          </button>
-                          <button
-                            onClick={() => confirm("delivered")}
-                            disabled={loading}
-                            style={{
-                              background: C.accent, border: "none", borderRadius: 12,
-                              padding: "14px 10px", color: "#07090F",
-                              fontSize: 13, fontWeight: 800, cursor: "pointer",
-                              display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-                              fontFamily: "'DM Sans',sans-serif",
-                              opacity: loading ? 0.6 : 1,
-                            }}
-                          >
-                            <span style={{ fontSize: 22 }}>{b.collection_type === "operator_delivers" ? "📬" : "✅"}</span>
-                            <span>{b.collection_type === "operator_delivers" ? "Mailed" : "Delivered"}</span>
-                            <span style={{ fontSize: 10, opacity: 0.8 }}>{b.collection_type === "operator_delivers" ? "Sent via USPS/UPS" : "We dropped it off"}</span>
+                            <span>📦</span>
+                            <span>Not Here — Hold for Next Trip</span>
                           </button>
                         </div>
-                        {/* Hold over — recipient didn't show up */}
-                        <button
-                          onClick={() => confirm("held")}
-                          disabled={loading}
-                          style={{
-                            width: "100%",
-                            background: "transparent",
-                            border: `1px solid ${C.border}`,
-                            borderRadius: 12, padding: "11px 14px",
-                            color: C.textSub, fontSize: 12, fontWeight: 700,
-                            cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
-                            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                            opacity: loading ? 0.6 : 1,
-                          }}
-                        >
-                          <span>📦</span>
-                          <span>Not Here — Hold for Next Trip</span>
-                        </button>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 );
               })}
