@@ -85,6 +85,14 @@ def _with_relations(query):
     )
 
 
+async def _refetch_booking(db: AsyncSession, booking_id: uuid.UUID) -> Booking:
+    """Re-fetch a booking with all relationships after a flush."""
+    result = await db.execute(
+        _with_relations(select(Booking).where(Booking.id == booking_id))
+    )
+    return result.scalar_one()
+
+
 async def _get_booking_or_404(
     db: AsyncSession,
     booking_id: uuid.UUID,
@@ -350,7 +358,7 @@ async def update_payment_status(
     """Operator marks a booking as paid, unpaid, or refunded."""
     booking.payment_status = body.payment_status
     await db.flush()
-    return booking
+    return await _refetch_booking(db, booking.id)
 
 
 async def update_booking_status(
@@ -372,7 +380,7 @@ async def update_booking_status(
         booking.collection_type = body.collection_type
 
     await db.flush()
-    return booking
+    return await _refetch_booking(db, booking.id)
 
 
 async def process_weigh_in(
@@ -439,7 +447,7 @@ async def process_weigh_in(
             booking.payment_status = body.payment_status
 
     await db.flush()
-    return booking
+    return await _refetch_booking(db, booking.id)
 
 
 async def process_scan(
@@ -451,7 +459,7 @@ async def process_scan(
     booking.scan_count      += 1
     booking.last_scanned_at  = datetime.now(UTC)
     await db.flush()
-    return booking
+    return await _refetch_booking(db, booking.id)
 
 
 async def process_package_scan(
@@ -502,6 +510,8 @@ async def process_package_scan(
             booking.status = BookingStatus.delivered
 
     await db.flush()
+    booking = await _refetch_booking(db, booking.id)
+    pkg = next(p for p in booking.packages if p.package_reference == ref_upper)
     return booking, pkg, all_done
 
 
