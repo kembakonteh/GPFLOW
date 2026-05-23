@@ -46,7 +46,7 @@ class OperatorContact(Base):
     )
 
     # ── Relationships ──────────────────────────────────────────────────────
-    operator: Mapped["Operator"] = relationship("Operator", back_populates="contacts")
+    operator: Mapped["Operator"] = relationship("Operator", back_populates="contacts", lazy="raise")
 
     def __repr__(self) -> str:
         return (

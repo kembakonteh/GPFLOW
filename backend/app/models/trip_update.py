@@ -55,8 +55,8 @@ class TripUpdate(Base):
     )
 
     # ── Relationships ──────────────────────────────────────────────────────
-    trip:     Mapped["Trip"]     = relationship("Trip",     back_populates="updates")
-    operator: Mapped["Operator"] = relationship("Operator")
+    trip:     Mapped["Trip"]     = relationship("Trip",     back_populates="updates", lazy="raise")
+    operator: Mapped["Operator"] = relationship("Operator",                            lazy="raise")
 
     def __repr__(self) -> str:
         return (

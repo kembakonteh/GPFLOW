@@ -103,13 +103,14 @@ class Trip(Base):
     )
 
     # ── Relationships ──────────────────────────────────────────────────────
-    operator:          Mapped["Operator"]               = relationship("Operator",            back_populates="trips")
-    bookings:          Mapped[list["Booking"]]          = relationship("Booking",             back_populates="trip")
-    updates:           Mapped[list["TripUpdate"]]       = relationship("TripUpdate",          back_populates="trip")
+    operator:          Mapped["Operator"]               = relationship("Operator",            back_populates="trips",    lazy="raise")
+    bookings:          Mapped[list["Booking"]]          = relationship("Booking",             back_populates="trip",     lazy="raise")
+    updates:           Mapped[list["TripUpdate"]]       = relationship("TripUpdate",          back_populates="trip",     lazy="raise")
     drop_off_locations: Mapped[list["TripDropoffLocation"]] = relationship(
         "TripDropoffLocation",
         back_populates="trip",
         cascade="all, delete-orphan",
+        lazy="raise",
     )
 
     def __repr__(self) -> str:
@@ -139,7 +140,7 @@ class TripDropoffLocation(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    trip: Mapped["Trip"] = relationship("Trip", back_populates="drop_off_locations")
+    trip: Mapped["Trip"] = relationship("Trip", back_populates="drop_off_locations", lazy="raise")
 
     def __repr__(self) -> str:
         return f"<TripDropoffLocation trip_id={self.trip_id} label={self.label!r}>"

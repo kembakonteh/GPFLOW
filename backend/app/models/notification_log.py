@@ -53,8 +53,8 @@ class NotificationLog(Base):
     error_message: Mapped[str | None]      = mapped_column(String(500))
 
     # ── Relationships ──────────────────────────────────────────────────────
-    booking:  Mapped["Booking | None"]  = relationship("Booking",  back_populates="notification_logs")
-    operator: Mapped["Operator"]        = relationship("Operator")
+    booking:  Mapped["Booking | None"]  = relationship("Booking",  back_populates="notification_logs", lazy="raise")
+    operator: Mapped["Operator"]        = relationship("Operator",                                      lazy="raise")
 
     def __repr__(self) -> str:
         return (

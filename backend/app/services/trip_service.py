@@ -139,12 +139,9 @@ async def create_trip(
         public_slug=slug,
     )
     db.add(trip)
-    await db.flush()
 
-    # Bulk-insert drop-off locations and attach to trip for in-memory access
-    loc_objs: list[TripDropoffLocation] = []
     for loc in data.drop_off_locations:
-        loc_obj = TripDropoffLocation(
+        db.add(TripDropoffLocation(
             id=uuid.uuid4(),
             trip_id=trip.id,
             label=loc.label,
@@ -152,14 +149,17 @@ async def create_trip(
             city=loc.city,
             state=loc.state,
             display_order=loc.display_order,
-        )
-        db.add(loc_obj)
-        loc_objs.append(loc_obj)
-    trip.drop_off_locations = loc_objs
+        ))
 
-    # Attach operator so direction_badge / response building works without an extra query
-    trip.operator = operator
-    return trip
+    await db.flush()
+
+    # Re-fetch with explicit eager loading so the returned object has all
+    # relationships loaded and no attribute access can trigger a lazy-load
+    # (which would raise MissingGreenlet in an async context).
+    result = await db.execute(
+        _with_operator(select(Trip).where(Trip.id == trip.id))
+    )
+    return result.scalar_one()
 
 
 async def get_trip(

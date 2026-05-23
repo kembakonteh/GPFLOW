@@ -111,8 +111,8 @@ class Operator(Base):
     )
 
     # ── Relationships ──────────────────────────────────────────────────────
-    trips:    Mapped[list["Trip"]]            = relationship("Trip",            back_populates="operator")
-    contacts: Mapped[list["OperatorContact"]] = relationship("OperatorContact", back_populates="operator")
+    trips:    Mapped[list["Trip"]]            = relationship("Trip",            back_populates="operator", lazy="raise")
+    contacts: Mapped[list["OperatorContact"]] = relationship("OperatorContact", back_populates="operator", lazy="raise")
 
     # ── Convenience property ───────────────────────────────────────────────
     @property

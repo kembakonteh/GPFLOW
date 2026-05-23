@@ -135,10 +135,10 @@ class Booking(Base):
     package_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     # ── Relationships ──────────────────────────────────────────────────────
-    trip:              Mapped["Trip"]                    = relationship("Trip",            back_populates="bookings")
-    operator:          Mapped["Operator"]                = relationship("Operator")
-    notification_logs: Mapped[list["NotificationLog"]]   = relationship("NotificationLog", back_populates="booking")
-    packages:          Mapped[list["BookingPackage"]]    = relationship("BookingPackage",  back_populates="booking", cascade="all, delete-orphan")
+    trip:              Mapped["Trip"]                    = relationship("Trip",            back_populates="bookings",   lazy="raise")
+    operator:          Mapped["Operator"]                = relationship("Operator",                                     lazy="raise")
+    notification_logs: Mapped[list["NotificationLog"]]   = relationship("NotificationLog", back_populates="booking",   lazy="raise")
+    packages:          Mapped[list["BookingPackage"]]    = relationship("BookingPackage",  back_populates="booking",   cascade="all, delete-orphan", lazy="raise")
 
     def __repr__(self) -> str:
         return (
@@ -172,7 +172,7 @@ class BookingPackage(Base):
     scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime]        = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    booking: Mapped["Booking"] = relationship("Booking", back_populates="packages")
+    booking: Mapped["Booking"] = relationship("Booking", back_populates="packages", lazy="raise")
 
     def __repr__(self) -> str:
         return f"<BookingPackage ref={self.package_reference!r} scan={self.scan_status.value}>"
