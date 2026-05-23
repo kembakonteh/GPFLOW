@@ -8,6 +8,7 @@ import BigBtn from "../components/ui/BigBtn";
 import InstallPrompt from "../components/ui/InstallPrompt";
 import TripSetupModal from "../components/modals/TripSetupModal";
 import WeighListModal from "../components/modals/WeighListModal";
+import WeighModal from "../components/modals/WeighModal";
 import DepartedModal from "../components/modals/DepartedModal";
 import CutoffModal from "../components/modals/CutoffModal";
 import ArrivedModal from "../components/modals/ArrivedModal";
@@ -73,6 +74,7 @@ export default function DashboardPage() {
   const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [annCopied, setAnnCopied] = useState(false);
   const [mailingBookingId, setMailingBookingId] = useState<string | null>(null);
+  const [weighBookingId,  setWeighBookingId]  = useState<string | null>(null);
 
   // ── Data ──────────────────────────────────────────────────────────────
   const { data: operator } = useQuery<Operator>({
@@ -620,7 +622,7 @@ export default function DashboardPage() {
                           )}
                         </div>
                       </div>
-                      {isWeighed && (() => {
+                      {isWeighed ? (() => {
                         const isMailOp = b.collection_type === "operator_delivers";
                         const hasMailing = isMailOp && b.mailing_fee_charged != null;
                         const currSym = b.currency === "USD" ? "$" : b.currency === "GBP" ? "£" : "€";
@@ -651,7 +653,21 @@ export default function DashboardPage() {
                             )}
                           </div>
                         );
-                      })()}
+                      })() : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setWeighBookingId(b.id); }}
+                          style={{
+                            background: "rgba(251,191,36,0.1)",
+                            border: `1px solid ${C.goldBorder}`,
+                            borderRadius: 10, padding: "8px 12px",
+                            color: C.gold, fontSize: 12, fontWeight: 800,
+                            cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                            flexShrink: 0,
+                          }}
+                        >
+                          ⚖️ Weigh
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -670,7 +686,11 @@ export default function DashboardPage() {
                   Pending ({toDeliver.length})
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-                  {toDeliver.map((b) => (
+                  {toDeliver.map((b) => {
+                    const bIsWeighed = b.packages.length > 0
+                      ? b.packages.every((p) => p.weight_kg != null)
+                      : b.confirmed_weight_kg != null;
+                    return (
                     <div key={b.id} style={{
                       background: C.card2, border: `1px solid ${C.tealBorder}`,
                       borderRadius: 14, padding: "13px 16px",
@@ -699,9 +719,25 @@ export default function DashboardPage() {
                             </div>
                           )}
                         </div>
+                        {!bIsWeighed && (
+                          <button
+                            onClick={() => setWeighBookingId(b.id)}
+                            style={{
+                              background: "rgba(251,191,36,0.1)",
+                              border: `1px solid ${C.goldBorder}`,
+                              borderRadius: 10, padding: "8px 12px",
+                              color: C.gold, fontSize: 12, fontWeight: 800,
+                              cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+                              flexShrink: 0,
+                            }}
+                          >
+                            ⚖️ Weigh
+                          </button>
+                        )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             )}
@@ -874,6 +910,23 @@ export default function DashboardPage() {
           }}
         />
       )}
+
+      {weighBookingId && trip && (() => {
+        const wb = bookings.find((b) => b.id === weighBookingId);
+        return wb ? (
+          <WeighModal
+            booking={wb}
+            trip={trip}
+            onClose={() => setWeighBookingId(null)}
+            onDone={(updated) => {
+              handleBookingUpdate(updated);
+              fire(`⚖️ ${updated.sender_name.split(" ")[0]} weighed`, C.gold);
+              setWeighBookingId(null);
+            }}
+            onBack={() => setWeighBookingId(null)}
+          />
+        ) : null;
+      })()}
 
       {mailingBookingId && trip && (() => {
         const mb = bookings.find((b) => b.id === mailingBookingId);
