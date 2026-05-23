@@ -75,7 +75,7 @@ export default function BookingFormPage() {
   const [wantsDelivery, setWantsDelivery] = useState<boolean | null>(null);
   const showDelivery = wantsDelivery !== null ? wantsDelivery : isInbound;
 
-  const allFilled = senderName && senderPhone && recipientName && recipientCity && itemDesc;
+  const allFilled = senderName && senderPhone && recipientName && (isInbound || recipientCity) && itemDesc;
 
   const cutoffFmt = trip ? new Date(trip.cutoff_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
   const origin    = trip ? `${trip.origin_city}, ${trip.origin_country}` : "";
@@ -91,7 +91,7 @@ export default function BookingFormPage() {
         sender_name:         senderName,
         sender_phone:        senderPhone,
         recipient_name:      recipientName,
-        recipient_city:      recipientCity,
+        recipient_city:      isInbound ? (trip.destination_city || "US") : recipientCity,
         item_description:    itemDesc,
         quantity:            1,
         package_count:       packageCount,
@@ -143,49 +143,64 @@ export default function BookingFormPage() {
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 15, fontWeight: 800, marginBottom: isInbound ? 4 : 16 }}>Your details</div>
           {isInbound && (
-            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 16 }}>Your info as the sender in Gambia</div>
+            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 16 }}>Your info as the receiver in the US</div>
           )}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
-              <label style={lbl}>Your Name</label>
+              <label style={lbl}>{isInbound ? "Your Name (Receiver)" : "Your Name"}</label>
               <input value={senderName} onChange={(e) => setSenderName(e.target.value)} placeholder="e.g. Fatou Camara" style={inp} />
             </div>
             <div>
-              <label style={lbl}>WhatsApp Number</label>
+              <label style={lbl}>{isInbound ? "Your WhatsApp Number (US)" : "WhatsApp Number"}</label>
               <input value={senderPhone} onChange={(e) => setSenderPhone(e.target.value)} placeholder="+1 206 555 0142" style={inp} />
+              {isInbound && (
+                <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>You'll receive all delivery updates on this number</div>
+              )}
             </div>
-            <div style={{
-              background: C.blueDim, border: `1px solid ${C.blueBorder}`,
-              borderRadius: 10, padding: "10px 14px", fontSize: 12, color: C.textSub,
-            }}>
-              📲 You'll receive WhatsApp confirmation and updates every stage.
-            </div>
+            {!isInbound && (
+              <div style={{
+                background: C.blueDim, border: `1px solid ${C.blueBorder}`,
+                borderRadius: 10, padding: "10px 14px", fontSize: 12, color: C.textSub,
+              }}>
+                📲 You'll receive WhatsApp confirmation and updates every stage.
+              </div>
+            )}
           </div>
         </div>
 
         {/* Who is this for */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 16 }}>
-            Who is this for?
+            {isInbound ? "Who is sending this?" : "Who is this for?"}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {isInbound ? (
             <div>
-              <label style={lbl}>{isInbound ? "Receiver Name" : "Recipient Name"}</label>
+              <label style={lbl}>Sender Name</label>
               <input
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
-                placeholder={isInbound ? "e.g. Lamin Camara" : "Lamin Camara"}
+                placeholder="e.g. Lamin Camara"
                 style={inp}
               />
-              {isInbound && (
-                <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>The person receiving the package in the US</div>
-              )}
+              <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>The person dropping off in Gambia</div>
             </div>
-            <div>
-              <label style={lbl}>{isInbound ? "Recipient City (US)" : "City in Gambia"}</label>
-              <input value={recipientCity} onChange={(e) => setRecipientCity(e.target.value)} placeholder={isInbound ? "e.g. Seattle" : "e.g. Serrekunda"} style={inp} />
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={lbl}>Recipient Name</label>
+                <input
+                  value={recipientName}
+                  onChange={(e) => setRecipientName(e.target.value)}
+                  placeholder="Lamin Camara"
+                  style={inp}
+                />
+              </div>
+              <div>
+                <label style={lbl}>City in Gambia</label>
+                <input value={recipientCity} onChange={(e) => setRecipientCity(e.target.value)} placeholder="e.g. Serrekunda" style={inp} />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Collection type toggle — always visible once trip is loaded */}
