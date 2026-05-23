@@ -3,23 +3,33 @@ import type { Booking, BookingPackage, Trip } from "../../types";
 interface Props {
   booking: Booking;
   trip: Trip;
-  pkg?: BookingPackage;  // when set, label shows per-package info
+  pkg?: BookingPackage;
 }
 
 export default function QRLabel({ booking, trip, pkg }: Props) {
   const origin = `${trip.origin_city}, ${trip.origin_country}`;
   const dest   = `${trip.destination_city}, ${trip.destination_country}`;
 
-  // Weight and cost: per-package if pkg supplied, otherwise booking-level
-  const rawKg   = pkg ? pkg.weight_kg : booking.confirmed_weight_kg;
-  const confKg  = rawKg != null ? Number(rawKg) : null;
-  const confLbs = confKg != null ? (confKg * 2.20462).toFixed(1) : null;
+  const isConsolidated = booking.packages.length > 1 && !pkg;
+
+  // Weight and cost — per-package or booking-level
+  const rawKg      = pkg ? pkg.weight_kg : booking.confirmed_weight_kg;
+  const confKg     = rawKg != null ? Number(rawKg) : null;
+  const confLbs    = confKg != null ? (confKg * 2.20462).toFixed(1) : null;
   const weightLabel = confLbs != null ? `${confLbs}lbs (${confKg!.toFixed(2)}kg)` : null;
   const costLabel   = pkg ? null : (booking.confirmed_cost_display ?? null);
 
-  // Reference: package ref if per-package, else booking ref
+  // Consolidated: sum of all confirmed package weights
+  const totalKg  = isConsolidated
+    ? booking.packages.reduce((s, p) => s + (p.weight_kg != null ? Number(p.weight_kg) : 0), 0)
+    : null;
+  const totalLbs = totalKg != null && totalKg > 0 ? (totalKg * 2.20462).toFixed(1) : null;
+  const consolidatedWeight = totalLbs ? `${totalLbs}lbs (${totalKg!.toFixed(2)}kg)` : null;
+
   const displayRef = pkg ? pkg.package_reference : booking.reference_number;
   const trackUrl   = `gpflow.app/track/${booking.reference_number}`;
+
+  const effectiveWeight = isConsolidated ? consolidatedWeight : weightLabel;
 
   return (
     <div style={{
@@ -44,17 +54,47 @@ export default function QRLabel({ booking, trip, pkg }: Props) {
             {pkg.description ? ` — ${pkg.description.toUpperCase()}` : ""}
           </div>
         )}
+        {isConsolidated && (
+          <div style={{
+            marginTop: 6, background: "#000", color: "#fff", borderRadius: 4,
+            padding: "2px 8px", display: "inline-block", fontSize: 9, fontWeight: 800, letterSpacing: "0.08em",
+          }}>
+            {booking.packages.length} PACKAGES
+          </div>
+        )}
       </div>
 
       {/* Reference */}
       <div style={{ textAlign: "center", background: "#000", borderRadius: 6, padding: "10px" }}>
         <div style={{ fontSize: 10, color: "#aaa", letterSpacing: "0.12em", marginBottom: 3 }}>
-          {pkg ? "PACKAGE REFERENCE" : "TRACKING REFERENCE"}
+          {pkg ? "PACKAGE REFERENCE" : "BOOKING REFERENCE"}
         </div>
         <div style={{ fontFamily: "monospace", fontSize: pkg ? 18 : 22, fontWeight: 900, color: "#fff", letterSpacing: "0.1em" }}>
           {displayRef}
         </div>
       </div>
+
+      {/* Package list — consolidated only */}
+      {isConsolidated && (
+        <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: "12px" }}>
+          <div style={{ fontSize: 9, color: "#888", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+            Package References
+          </div>
+          {booking.packages.map((p) => {
+            const pkgLbs = p.weight_kg != null ? (Number(p.weight_kg) * 2.20462).toFixed(1) : null;
+            return (
+              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                <code style={{ fontSize: 12, fontWeight: 700, color: "#000", fontFamily: "monospace" }}>
+                  {p.package_reference}
+                </code>
+                {pkgLbs && (
+                  <span style={{ fontSize: 11, color: "#059669", fontWeight: 700 }}>{pkgLbs}lbs</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* From → To */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 6, alignItems: "center" }}>
@@ -78,9 +118,9 @@ export default function QRLabel({ booking, trip, pkg }: Props) {
         <div style={{ fontSize: 13, fontWeight: 700, color: "#000" }}>{booking.item_description}</div>
         <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
           <div>
-            <div style={{ fontSize: 9, color: "#888" }}>WEIGHT</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: weightLabel ? "#059669" : "#d97706" }}>
-              {weightLabel ?? "Pending"}
+            <div style={{ fontSize: 9, color: "#888" }}>{isConsolidated ? "TOTAL WEIGHT" : "WEIGHT"}</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: effectiveWeight ? "#059669" : "#d97706" }}>
+              {effectiveWeight ?? "Pending"}
             </div>
           </div>
           <div>
@@ -89,12 +129,14 @@ export default function QRLabel({ booking, trip, pkg }: Props) {
               {costLabel ?? "TBC"}
             </div>
           </div>
-          <div>
-            <div style={{ fontSize: 9, color: "#888" }}>QTY</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#000" }}>{booking.quantity} pcs</div>
-          </div>
+          {!isConsolidated && (
+            <div>
+              <div style={{ fontSize: 9, color: "#888" }}>QTY</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#000" }}>{booking.quantity} pcs</div>
+            </div>
+          )}
         </div>
-        {weightLabel && (
+        {effectiveWeight && (
           <div style={{ marginTop: 6, fontSize: 9, color: "#059669", fontWeight: 700 }}>✓ Weight & cost confirmed at drop-off</div>
         )}
       </div>

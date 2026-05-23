@@ -19,7 +19,6 @@ interface Props {
 export default function WeighModal({ booking, trip, onClose, onDone, onBack }: Props) {
   const isMulti = booking.packages.length > 1;
 
-  // For multi-package: start on first unweighed package
   const firstUnweighedIdx = isMulti
     ? Math.max(0, booking.packages.findIndex((p) => p.weight_kg == null))
     : 0;
@@ -34,7 +33,6 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
 
   const pkg: BookingPackage | undefined = latestBooking.packages[pkgIdx];
   const allWeighed = latestBooking.packages.every((p) => p.weight_kg != null);
-  const isLastPkg  = pkgIdx === latestBooking.packages.length - 1 || allWeighed;
 
   const rateLb = trip.rate_per_kg / KG_TO_LB;
   const lbsNum = parseFloat(lbs) || 0;
@@ -43,7 +41,6 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
 
   const isMailingApplicable = booking.collection_type === "operator_delivers";
 
-  // Running total of weighed packages in lbs
   const weighedLbs = latestBooking.packages
     .filter((p) => p.weight_kg != null)
     .reduce((s, p) => s + Number(p.weight_kg!) * KG_TO_LB, 0);
@@ -59,7 +56,20 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
 
       const { data } = await api.post<Booking>(`/bookings/${booking.id}/weigh`, payload);
       setLatestBooking(data);
-      setState("label");
+
+      if (isMulti) {
+        // Skip label between packages — only show consolidated label when all are weighed
+        const nextUnweighedIdx = data.packages.findIndex((p) => p.weight_kg == null);
+        if (nextUnweighedIdx !== -1) {
+          setPkgIdx(nextUnweighedIdx);
+          setLbs("");
+          // stay in weigh state
+        } else {
+          setState("label");
+        }
+      } else {
+        setState("label");
+      }
     } catch (e: unknown) {
       const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setError(typeof detail === "string" ? detail : "Failed to save weight — please try again.");
@@ -68,44 +78,44 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
     }
   }
 
-  function handleNextPackage() {
-    // Find next unweighed package after current
-    const nextIdx = latestBooking.packages.findIndex(
-      (p, i) => i > pkgIdx && p.weight_kg == null
-    );
-    if (nextIdx !== -1) {
-      setPkgIdx(nextIdx);
-      setLbs("");
-      setState("weigh");
-    } else {
-      // All done
-      onDone(latestBooking);
-      onBack();
-    }
-  }
-
   function handleDone() {
     onDone(latestBooking);
     onBack();
   }
 
-  // WhatsApp URL (single link for the booking, regardless of package count)
+  // WhatsApp message — consolidated for multi-package
   const waHref = (() => {
     const b   = latestBooking;
     const fn  = b.sender_name.split(" ")[0];
     const ref = b.reference_number;
     const op  = trip.operator_business_name;
     const trackUrl = `${window.location.origin}/track/${ref}`;
-    const msg = encodeURIComponent(
-      `Hi ${fn} 👋\nHere is the tracking link for ${b.recipient_name}'s package 🏷️\n\n` +
-      `📲 ${trackUrl}\n\n` +
-      `Please forward this to ${b.recipient_name} in ${b.recipient_city} so they can track the package and show their reference number when collecting.\n\n` +
-      `Ref: ${ref}\n— ${op} via GPFLOW`
-    );
-    return `https://wa.me/?text=${msg}`;
+
+    let msg: string;
+    if (isMulti) {
+      const pkgList = b.packages
+        .map((p) => `• ${p.package_reference}`)
+        .join("\n");
+      msg =
+        `Hi ${fn} 👋\n` +
+        `Here are the labels for ${b.recipient_name}'s ${b.packages.length} packages 🏷️\n\n` +
+        `📲 ${trackUrl}\n\n` +
+        `Package refs:\n${pkgList}\n\n` +
+        `Booking ref: ${ref}\n\n` +
+        `Please forward these to ${b.recipient_name} in ${b.recipient_city} so they can show them when collecting.\n\n` +
+        `— ${op} via GPFLOW`;
+    } else {
+      msg =
+        `Hi ${fn} 👋\nHere is the tracking link for ${b.recipient_name}'s package 🏷️\n\n` +
+        `📲 ${trackUrl}\n\n` +
+        `Please forward this to ${b.recipient_name} in ${b.recipient_city} so they can track the package and show their reference number when collecting.\n\n` +
+        `Ref: ${ref}\n— ${op} via GPFLOW`;
+    }
+    return `https://wa.me/?text=${encodeURIComponent(msg)}`;
   })();
 
-  if (screenMode && pkg) {
+  // Full-screen label mode
+  if (screenMode) {
     return (
       <div style={{
         position: "fixed", inset: 0, zIndex: 9999,
@@ -120,7 +130,7 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
           Hold up — sender takes a screenshot of this label
         </div>
         <div style={{ flex: 1, overflowY: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 20px 8px" }}>
-          <QRLabel booking={latestBooking} trip={trip} pkg={isMulti ? pkg : undefined} />
+          <QRLabel booking={latestBooking} trip={trip} pkg={isMulti ? undefined : pkg} />
         </div>
         <div style={{ display: "flex", gap: 0, width: "100%", maxWidth: 540, flexShrink: 0 }}>
           <button
@@ -135,7 +145,7 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
             }}
           >←</button>
           <button
-            onClick={() => { setScreenMode(false); if (isLastPkg) handleDone(); else handleNextPackage(); }}
+            onClick={() => { setScreenMode(false); handleDone(); }}
             style={{
               flex: 1,
               background: C.accent, color: "#07090F",
@@ -144,7 +154,7 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
               fontFamily: "'DM Sans',sans-serif",
             }}
           >
-            {isLastPkg ? "✓ Done" : "✓ Next Package →"}
+            ✓ Done
           </button>
         </div>
       </div>
@@ -281,7 +291,8 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
             <div style={{ marginBottom: 14, paddingRight: 40 }}>
               <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 2 }}>🏷️ QR Label Ready</div>
               <div style={{ fontSize: 12, color: C.textSub }}>
-                {latestBooking.sender_name} · {isMulti && pkg ? pkg.package_reference : latestBooking.reference_number}
+                {latestBooking.sender_name} · {latestBooking.reference_number}
+                {isMulti && ` · ${latestBooking.packages.length} packages`}
               </div>
             </div>
 
@@ -297,15 +308,11 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
                   Sends tracking link to {booking.sender_name.split(" ")[0]}
                 </span>
               </a>
-              <button onClick={() => window.print()} style={optBtn(C.teal)}>
-                <span>🖨️ Print Label</span>
-                <span style={{ fontSize: 12, color: C.textSub }}>Send to printer</span>
-              </button>
             </div>
 
-            {/* Done / Next */}
+            {/* Done */}
             <button
-              onClick={isLastPkg ? handleDone : handleNextPackage}
+              onClick={handleDone}
               style={{
                 width: "100%",
                 background: `linear-gradient(135deg,${C.accent},#00A87A)`,
@@ -316,16 +323,23 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
                 marginBottom: 16,
               }}
             >
-              <span>{isLastPkg ? "✓ Done" : "✓ Next Package →"}</span>
+              <span>✓ Done</span>
               <span>→</span>
             </button>
 
             {/* Label preview */}
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
               <div style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.5)", borderRadius: 14, transform: "scale(0.92)", transformOrigin: "top center" }}>
-                <QRLabel booking={latestBooking} trip={trip} pkg={isMulti && pkg ? pkg : undefined} />
+                <QRLabel booking={latestBooking} trip={trip} pkg={isMulti ? undefined : pkg} />
               </div>
             </div>
+
+            {/* All-weighed confirmation for multi */}
+            {isMulti && allWeighed && (
+              <div style={{ textAlign: "center", fontSize: 11, color: C.accent, fontWeight: 700, marginTop: 4 }}>
+                ✓ All {latestBooking.packages.length} packages weighed
+              </div>
+            )}
           </>
         )}
       </div>
