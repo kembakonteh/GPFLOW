@@ -268,25 +268,31 @@ async def create_booking(
         delivery_notes=body.delivery_notes,
     )
     db.add(booking)
+    # Flush now so booking.id is populated by the DB before BookingPackage rows
+    # reference it — column default=uuid.uuid4 is only called at INSERT time,
+    # so booking.id is None until this flush.
+    await db.flush()
 
-    # Auto-create one BookingPackage row per package
     pkg_list: list[BookingPackage] = []
     for i in range(pkg_count):
-        pkg = BookingPackage(
+        pkg_list.append(BookingPackage(
             booking_id=booking.id,
             package_number=i + 1,
             package_reference=f"{ref}-P{i + 1}",
-        )
-        db.add(pkg)
-        pkg_list.append(pkg)
+        ))
+    db.add_all(pkg_list)
 
-    # Upsert sender into operator's contact list
     await upsert_contact(db, trip.operator_id, body.sender_name, body.sender_phone)
 
     await db.flush()
-    # Set in-memory so the route can access packages without a lazy-load
-    booking.packages = pkg_list
-    return booking
+
+    # Re-fetch with explicit eager loading (all relationships have lazy="raise")
+    result = await db.execute(
+        select(Booking)
+        .options(selectinload(Booking.packages))
+        .where(Booking.id == booking.id)
+    )
+    return result.scalar_one()
 
 
 async def get_booking(
