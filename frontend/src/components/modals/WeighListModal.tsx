@@ -35,6 +35,7 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
   const [waDeliveryState, setWaDeliveryState] = useState("");
   const [waDeliveryZip, setWaDeliveryZip]     = useState("");
   const [waDeliveryNotes, setWaDeliveryNotes] = useState("");
+  const [waPackageCount, setWaPackageCount]   = useState(1);
 
   const isFullyWeighed = (b: Booking) => {
     if (b.packages && b.packages.length > 0) return b.packages.every((p) => p.weight_kg != null);
@@ -76,6 +77,7 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
         item_description: waItems,
         quantity: 1,
         estimated_weight_kg: 0,
+        package_count: waPackageCount,
       };
       if (isInbound) {
         payload.collection_type = waCollectionType;
@@ -452,6 +454,44 @@ export default function WeighListModal({ trip, bookings, onClose, onBookingUpdat
               <div>
                 <label style={lblStyle}>What are they sending?</label>
                 <input value={waItems} onChange={(e) => setWaItems(e.target.value)} placeholder="e.g. Clothes, medicine, shoes" style={inpStyle} />
+              </div>
+
+              <div>
+                <label style={lblStyle}>Number of Packages</label>
+                <div style={{ fontSize: 11, color: C.textSub, marginBottom: 8 }}>
+                  Each package gets its own QR label and tracking code
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+                  <button
+                    onClick={() => setWaPackageCount((n) => Math.max(1, n - 1))}
+                    style={{
+                      width: 44, height: 44, borderRadius: "10px 0 0 10px",
+                      background: C.card2, border: `1px solid ${C.border}`,
+                      color: C.text, fontSize: 20, fontWeight: 700,
+                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                      fontFamily: "'DM Sans',sans-serif",
+                    }}
+                  >−</button>
+                  <div style={{
+                    flex: 1, height: 44,
+                    background: C.card2,
+                    borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 18, fontWeight: 800, color: C.text,
+                  }}>
+                    {waPackageCount}
+                  </div>
+                  <button
+                    onClick={() => setWaPackageCount((n) => Math.min(20, n + 1))}
+                    style={{
+                      width: 44, height: 44, borderRadius: "0 10px 10px 0",
+                      background: C.card2, border: `1px solid ${C.border}`,
+                      color: C.text, fontSize: 20, fontWeight: 700,
+                      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                      fontFamily: "'DM Sans',sans-serif",
+                    }}
+                  >+</button>
+                </div>
               </div>
 
               <button
