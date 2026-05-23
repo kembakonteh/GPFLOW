@@ -42,9 +42,10 @@ class TripCreate(BaseModel):
     rate_per_kg:         Decimal        = Field(..., gt=0, description="Rate in operator's display unit — converted to kg/unit server-side")
     currency:            str            = Field("USD", min_length=3, max_length=3)
     capacity_kg:         Decimal | None = Field(None, gt=0)
-    accepted_item_types: list[str]                = []
-    customs_advisory:    str | None               = None
-    drop_off_locations:  list[DropoffLocationCreate] = []
+    accepted_item_types:  list[str]                = []
+    customs_advisory:     str | None               = None
+    domestic_mailing_fee: Decimal | None           = None
+    drop_off_locations:   list[DropoffLocationCreate] = []
 
     @model_validator(mode="after")
     def validate_trip(self) -> "TripCreate":
@@ -74,10 +75,11 @@ class TripUpdate(BaseModel):
     rate_per_kg:         Decimal | None       = Field(None, gt=0)
     currency:            str | None           = Field(None, min_length=3, max_length=3)
     capacity_kg:         Decimal | None       = None   # None means "clear"
-    accepted_item_types: list[str] | None                = None
-    customs_advisory:    str | None                      = None
-    status:              TripStatus | None               = None
-    drop_off_locations:  list[DropoffLocationCreate] | None = None
+    accepted_item_types:  list[str] | None                = None
+    customs_advisory:     str | None                      = None
+    domestic_mailing_fee: Decimal | None                  = None
+    status:               TripStatus | None               = None
+    drop_off_locations:   list[DropoffLocationCreate] | None = None
 
 
 # ── Arrival ───────────────────────────────────────────────────────────────────
@@ -112,11 +114,12 @@ class TripResponse(BaseModel):
     pricing_model:       str
     rate_per_kg:         Decimal
     currency:            str
-    capacity_kg:         Decimal | None
-    accepted_item_types: list
-    customs_advisory:    str | None
-    public_slug:         str
-    view_count:          int
+    capacity_kg:          Decimal | None
+    accepted_item_types:  list
+    customs_advisory:     str | None
+    domestic_mailing_fee: Decimal | None
+    public_slug:          str
+    view_count:           int
     pickup_location:     str | None
     pickup_window:       str | None
     pickup_notes:        str | None
@@ -147,11 +150,12 @@ class PublicTripResponse(BaseModel):
     pricing_model:       str
     rate_display:        str      # e.g. "$3.62/lb" or "$8.00/kg"
     currency:            str
-    capacity_kg:         Decimal | None
-    spots_remaining:     int | None   # None when capacity not set
-    accepted_item_types: list
-    customs_advisory:    str | None
-    public_slug:         str
+    capacity_kg:          Decimal | None
+    spots_remaining:      int | None   # None when capacity not set
+    accepted_item_types:  list
+    customs_advisory:     str | None
+    domestic_mailing_fee: Decimal | None = None
+    public_slug:          str
     view_count:          int
     pickup_location:     str | None
     pickup_window:       str | None

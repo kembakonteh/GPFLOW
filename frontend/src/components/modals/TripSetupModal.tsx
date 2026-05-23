@@ -31,6 +31,7 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
   const [createdTrip, setCreatedTrip] = useState<Trip | null>(null);
   const [announcement, setAnnouncement] = useState<TripAnnouncement | null>(null);
   const [annCopied, setAnnCopied] = useState(false);
+  const [mailingFee, setMailingFee] = useState("");
 
   const rateLbNum = parseFloat(rateLb) || 0;
   const slug = `trip-${Date.now()}`;
@@ -85,6 +86,7 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
         rate_per_kg: ratePerKg,
         currency,
         accepted_item_types: itemTypes,
+        domestic_mailing_fee: parseFloat(mailingFee) > 0 ? parseFloat(mailingFee) : undefined,
         drop_off_locations: dropoffLocs
           .filter((loc) => loc.label.trim())
           .map((loc, i) => ({
@@ -384,6 +386,26 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
                   5lb = {currSym}{(5 * rateLbNum).toFixed(2)} · 10lb = {currSym}{(10 * rateLbNum).toFixed(2)}
                 </div>
               )}
+            </div>
+
+            {/* Domestic mailing fee */}
+            <div style={{ textAlign: "left", marginBottom: 20 }}>
+              <label style={lbl}>Domestic Mailing Fee (USD) — optional</label>
+              <div style={{ fontSize: 11, color: C.textSub, marginBottom: 6 }}>
+                Flat fee charged per booking when you deliver to the customer's US address
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 16, color: C.textSub, fontWeight: 700 }}>$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={mailingFee}
+                  onChange={(e) => setMailingFee(e.target.value)}
+                  placeholder="0.00"
+                  style={{ ...inp, width: "100%" }}
+                />
+              </div>
             </div>
 
             <div style={{ display: "flex", gap: 10 }}>

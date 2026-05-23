@@ -41,6 +41,9 @@ class BookingCreate(BaseModel):
     # Customer's preferred collection method — operator can override at arrival
     collection_type: CollectionType | None = None
 
+    # Mailing fee — auto-computed from trip.domestic_mailing_fee when operator_delivers
+    mailing_fee_charged: Decimal | None = None
+
     # Delivery address — optional, for operator_delivers bookings
     delivery_address_line1: str | None = Field(None, max_length=255)
     delivery_address_line2: str | None = Field(None, max_length=255)
@@ -164,6 +167,7 @@ class BookingResponse(BaseModel):
     delivery_zip:           str | None
     delivery_country:       str | None
     delivery_notes:         str | None
+    mailing_fee_charged:    Decimal | None
 
     created_at: datetime
     updated_at: datetime
@@ -209,6 +213,7 @@ class BookingPublicResponse(BaseModel):
     delivery_zip:           str | None = None
     delivery_country:       str | None = None
     delivery_notes:         str | None = None
+    mailing_fee_charged:    Decimal | None = None
 
 
 # ── Tracking (public, sender-facing) ─────────────────────────────────────────

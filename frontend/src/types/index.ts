@@ -121,11 +121,12 @@ export interface Trip {
   pricing_model:       PricingModel;
   rate_per_kg:         number;
   currency:            string;
-  capacity_kg?:        number;
-  accepted_item_types: string[];
-  customs_advisory?:   string;
-  public_slug:         string;
-  view_count:          number;
+  capacity_kg?:          number;
+  accepted_item_types:   string[];
+  customs_advisory?:     string;
+  domestic_mailing_fee?: number;
+  public_slug:           string;
+  view_count:            number;
   pickup_location?:      string;
   pickup_window?:        string;
   pickup_notes?:         string;
@@ -231,6 +232,7 @@ export interface Booking {
   delivery_zip?:           string;
   delivery_country?:       string;
   delivery_notes?:         string;
+  mailing_fee_charged?:    number;
   trip_public_slug?:    string;
   trip_departure_date?: string;
   trip_direction?:      string;
@@ -282,11 +284,12 @@ export interface PublicTrip {
   pricing_model:       PricingModel;
   rate_display:        string;   // e.g. '$3.62/lb'
   currency:            string;
-  capacity_kg?:        number;
-  spots_remaining?:    number;
-  accepted_item_types: string[];
-  customs_advisory?:   string;
-  public_slug:         string;
+  capacity_kg?:          number;
+  spots_remaining?:      number;
+  accepted_item_types:   string[];
+  customs_advisory?:     string;
+  domestic_mailing_fee?: number;
+  public_slug:           string;
   view_count:          number;
   pickup_location?:    string;
   pickup_window?:      string;
@@ -379,4 +382,5 @@ export interface BookingPublicResponse {
   delivery_zip?:           string;
   delivery_country?:       string;
   delivery_notes?:         string;
+  mailing_fee_charged?:    number;
 }

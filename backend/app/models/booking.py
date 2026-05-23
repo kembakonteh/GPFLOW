@@ -122,6 +122,7 @@ class Booking(Base):
     delivery_zip:           Mapped[str | None] = mapped_column(String(20))
     delivery_country:       Mapped[str | None] = mapped_column(String(2))
     delivery_notes:         Mapped[str | None] = mapped_column(String(500))
+    mailing_fee_charged:    Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

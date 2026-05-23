@@ -141,7 +141,10 @@ export default function BookingFormPage() {
 
         {/* Your details */}
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 16 }}>Your details</div>
+          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: isInbound ? 4 : 16 }}>Your details</div>
+          {isInbound && (
+            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 16 }}>Your contact info as the receiver in the US</div>
+          )}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
               <label style={lbl}>Your Name</label>
@@ -162,11 +165,21 @@ export default function BookingFormPage() {
 
         {/* Who is this for */}
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 16 }}>Who is this for?</div>
+          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 16 }}>
+            {isInbound ? "Who is sending this?" : "Who is this for?"}
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label style={lbl}>Recipient Name</label>
-              <input value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Lamin Camara" style={inp} />
+              <label style={lbl}>{isInbound ? "Sender Name" : "Recipient Name"}</label>
+              <input
+                value={recipientName}
+                onChange={(e) => setRecipientName(e.target.value)}
+                placeholder={isInbound ? "e.g. Fatou Camara" : "Lamin Camara"}
+                style={inp}
+              />
+              {isInbound && (
+                <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>The person dropping off the package in Gambia</div>
+              )}
             </div>
             <div>
               <label style={lbl}>City in Gambia</label>
@@ -255,6 +268,20 @@ export default function BookingFormPage() {
                 <input value={deliveryNotes} onChange={(e) => setDeliveryNotes(e.target.value)} placeholder="Gate code, call on arrival, etc." style={inp} />
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Mailing fee notice */}
+        {showDelivery && (trip?.domestic_mailing_fee ?? 0) > 0 && (
+          <div style={{
+            background: C.goldDim, border: `1px solid ${C.goldBorder}`,
+            borderRadius: 10, padding: "10px 14px",
+            fontSize: 12, color: C.gold, display: "flex", gap: 8, marginBottom: 24,
+          }}>
+            <span style={{ flexShrink: 0 }}>📬</span>
+            <span>
+              A domestic mailing fee of <strong>${Number(trip!.domestic_mailing_fee).toFixed(2)}</strong> will be added to your total for home delivery.
+            </span>
           </div>
         )}
 

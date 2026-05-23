@@ -127,6 +127,7 @@ async def get_public(
         spots_remaining=spots,
         accepted_item_types=trip.accepted_item_types,
         customs_advisory=trip.customs_advisory,
+        domestic_mailing_fee=trip.domestic_mailing_fee,
         public_slug=trip.public_slug,
         view_count=trip.view_count,
         pickup_location=trip.pickup_location,

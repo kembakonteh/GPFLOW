@@ -606,6 +606,16 @@ export default function DashboardPage() {
                               📞 {b.sender_phone}
                             </a>
                           )}
+                          {(b.mailing_fee_charged ?? 0) > 0 && (
+                            <div style={{
+                              display: "inline-flex", alignItems: "center",
+                              background: C.accentDim, border: `1px solid ${C.accentBorder}`,
+                              borderRadius: 6, padding: "2px 7px",
+                              fontSize: 10, fontWeight: 700, color: C.accent,
+                            }}>
+                              📬 +${Number(b.mailing_fee_charged).toFixed(2)} mailing
+                            </div>
+                          )}
                         </div>
                       </div>
                       {isWeighed && (

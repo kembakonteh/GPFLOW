@@ -147,6 +147,7 @@ def _to_booking_response(booking: Booking) -> BookingResponse:
         delivery_zip=booking.delivery_zip,
         delivery_country=booking.delivery_country,
         delivery_notes=booking.delivery_notes,
+        mailing_fee_charged=booking.mailing_fee_charged,
         created_at=booking.created_at,
         updated_at=booking.updated_at,
         trip_public_slug=trip.public_slug if trip else None,
@@ -245,6 +246,13 @@ async def create_booking(
     # Estimated cost
     estimated_minor = _calculate_cost_minor(body.estimated_weight_kg, trip.rate_per_kg)
 
+    # Snapshot mailing fee at booking time so it's preserved if trip fee changes later
+    mailing_fee = (
+        trip.domestic_mailing_fee
+        if body.collection_type == CollectionType.operator_delivers and trip.domestic_mailing_fee
+        else None
+    )
+
     ref = await _generate_reference_number(db)
 
     pkg_count = max(1, body.package_count)
@@ -274,6 +282,7 @@ async def create_booking(
         delivery_zip=body.delivery_zip,
         delivery_country=body.delivery_country,
         delivery_notes=body.delivery_notes,
+        mailing_fee_charged=mailing_fee,
     )
     db.add(booking)
     # Flush now so booking.id is populated by the DB before BookingPackage rows
