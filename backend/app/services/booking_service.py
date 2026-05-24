@@ -61,9 +61,17 @@ async def _generate_reference_number(db: AsyncSession) -> str:
 
 # ── Cost helpers ──────────────────────────────────────────────────────────────
 
-def _calculate_cost_minor(weight_kg: Decimal, rate_per_kg: Decimal) -> int:
-    """Return cost in minor currency units (cents). Rounds half-up."""
-    cost = (weight_kg * rate_per_kg).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+def _calculate_cost_minor(weight_kg, rate_per_kg) -> int:
+    """Return cost in minor currency units (cents).
+
+    Converts inputs via str() before creating Decimals so that float
+    representations like 26.455439999999998 don't carry binary noise
+    into the multiplication (which would otherwise round to $119.96
+    instead of $120.00 for 10 lbs × $12/lb).
+    """
+    d_weight = Decimal(str(weight_kg))
+    d_rate   = Decimal(str(rate_per_kg))
+    cost     = (d_weight * d_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return int(cost * 100)
 
 

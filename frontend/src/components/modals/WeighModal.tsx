@@ -42,7 +42,7 @@ export default function WeighModal({ booking, trip, onClose, onDone, onBack }: P
 
   const rateLb = trip.rate_per_kg / KG_TO_LB;
   const lbsNum = parseFloat(lbs) || 0;
-  const cost   = (lbsNum * rateLb).toFixed(2);
+  const cost   = (Math.round(lbsNum * rateLb * 100) / 100).toFixed(2);
   const currSym = trip.currency === "USD" ? "$" : trip.currency === "GBP" ? "£" : "€";
 
   const isMailingApplicable = booking.collection_type === "operator_delivers";
