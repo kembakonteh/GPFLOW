@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { C } from "../../lib/tokens";
+import { C, KG_TO_LB } from "../../lib/tokens";
 import { api } from "../../lib/api";
 import Modal from "../ui/Modal";
 import CloseBtn from "../ui/CloseBtn";
@@ -68,7 +68,7 @@ export default function TripSetupModal({ operatorCity = "Your City", onClose, on
     setLoading(true);
     setError("");
     try {
-      const ratePerKg = rateLbNum; // backend converts lb→kg based on operator.weight_unit
+      const ratePerKg = rateLbNum * KG_TO_LB; // operator enters $/lb — convert to $/kg for storage
       const originCity = origin.split(",")[0].trim();
       const destCity   = dest.split(",")[0].trim();
       // Always use 2-char ISO codes based on direction
