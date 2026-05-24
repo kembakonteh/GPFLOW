@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import { C } from "../lib/tokens";
+import { C, KG_TO_LB } from "../lib/tokens";
 import type { PublicTrip } from "../types";
 
 function NavBar({ label }: { label: string }) {
@@ -104,7 +104,7 @@ export default function PublicTripPage() {
             {[
               { icon: "✈️", label: "Departs", value: departFmt },
               { icon: "📅", label: "Cutoff",  value: cutoffFmt },
-              { icon: "💰", label: "Rate",    value: trip.rate_display },
+              { icon: "💰", label: "Rate",    value: `${trip.currency === "USD" ? "$" : trip.currency === "GBP" ? "£" : "€"}${(trip.rate_per_kg / KG_TO_LB).toFixed(2)}/lb` },
             ].map(({ icon, label, value }) => (
               <div key={label} style={{
                 background: C.card2, borderRadius: 12, padding: "12px",

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import { C } from "../lib/tokens";
+import { C, KG_TO_LB } from "../lib/tokens";
 import type { BookingPublicResponse, PublicTrip } from "../types";
 
 function NavBar({ label, onBack }: { label: string; onBack?: () => void }) {
@@ -134,7 +134,7 @@ export default function BookingFormPage() {
               <div style={{ fontSize: 11, color: C.textSub, marginTop: 2 }}>{trip.operator_business_name} · Cutoff {cutoffFmt}</div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: C.gold }}>{trip.rate_display}</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: C.gold }}>{trip.currency === "USD" ? "$" : trip.currency === "GBP" ? "£" : "€"}{(trip.rate_per_kg / KG_TO_LB).toFixed(2)}/lb</div>
             </div>
           </div>
         )}
