@@ -285,6 +285,7 @@ export interface PublicTrip {
   status:              TripStatus;
   pricing_model:       PricingModel;
   rate_display:        string;   // e.g. '$3.62/lb'
+  rate_per_kg:         number;
   currency:            string;
   capacity_kg?:          number;
   spots_remaining?:      number;
