@@ -181,6 +181,12 @@ export default function ArrivedModal({ trip, bookings, onClose, onArrived }: Pro
         {/* ── Step: notify ───────────────────────────────────────────────── */}
         {step === "notify" && (
           <>
+            <button
+              onClick={() => setStep("form")}
+              style={{ background: "none", border: "none", color: C.textSub, cursor: "pointer", fontSize: 13, marginBottom: 12, fontFamily: "'DM Sans',sans-serif", padding: 0 }}
+            >
+              ← Back
+            </button>
             <div style={{ paddingRight: 40, marginBottom: 24 }}>
               <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>✅ Arrival Confirmed!</div>
               <div style={{ fontSize: 12, color: C.textSub }}>

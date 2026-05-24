@@ -112,6 +112,12 @@ export default function DepartedModal({ trip, bookings, onClose, onDeparted }: P
           </>
         ) : (
           <>
+            <button
+              onClick={() => setConfirmed(false)}
+              style={{ background: "none", border: "none", color: C.textSub, cursor: "pointer", fontSize: 13, marginBottom: 12, fontFamily: "'DM Sans',sans-serif", padding: 0 }}
+            >
+              ← Back
+            </button>
             {/* Sample message */}
             {sample && (
               <div style={{

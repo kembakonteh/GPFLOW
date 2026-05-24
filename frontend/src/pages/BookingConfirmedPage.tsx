@@ -62,6 +62,15 @@ export default function BookingConfirmedPage() {
         borderBottom: `1px solid ${C.border}`, padding: "14px 20px",
         display: "flex", alignItems: "center", gap: 10,
       }}>
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            background: "transparent", border: `1px solid ${C.border}`,
+            borderRadius: 8, color: C.textSub, padding: "5px 12px",
+            fontSize: 11, fontWeight: 600, cursor: "pointer", marginRight: 6,
+            fontFamily: "'DM Sans',sans-serif",
+          }}
+        >←</button>
         <div style={{
           width: 30, height: 30, borderRadius: 7,
           background: `linear-gradient(135deg,${C.accent},#00A87A)`,
