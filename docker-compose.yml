@@ -1,58 +1,191 @@
 services:
-  postgres:
+  db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: gpflow
-      POSTGRES_USER: gpflow
-      POSTGRES_PASSWORD: gpflow
-    ports:
-      - "5433:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-gpflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-gpflow}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gpflow"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gpflow}"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - gpflow-internal
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "6380:6379"
-    volumes:
-      - redis_data:/data
+      - "6383:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - gpflow-internal
 
-  api:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-gpflow}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-gpflow}
+      REDIS_URL: redis://redis:6379
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-30}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY: ${R2_ACCESS_KEY:-}
+      R2_SECRET_KEY: ${R2_SECRET_KEY:-}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:-gpflow-uploads}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_PHONE_ID: ${WHATSAPP_PHONE_ID:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      FRONTEND_URL: ${FRONTEND_URL:-https://gpflow.kafotech.io}
+      ENVIRONMENT: ${ENVIRONMENT:-prod}
+    ports:
+      - "8004:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - gpflow-internal
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gpflow-api.rule=Host(`gpflow.kafotech.io`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.gpflow-api.priority=100"
+      - "traefik.http.routers.gpflow-api.entrypoints=websecure"
+      - "traefik.http.routers.gpflow-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.gpflow-api.loadbalancer.server.port=8000"
+
+  worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - ./backend/.env
+      - ./.env
+    command: python -m arq app.workers.tasks.WorkerSettings
     environment:
-      # Override localhost URLs with Docker service names
-      DATABASE_URL: postgresql+asyncpg://gpflow:gpflow@postgres:5432/gpflow
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-gpflow}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-gpflow}
       REDIS_URL: redis://redis:6379
-    ports:
-      - "8000:8000"
+      SECRET_KEY: ${SECRET_KEY}
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_PHONE_ID: ${WHATSAPP_PHONE_ID:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      FRONTEND_URL: ${FRONTEND_URL:-https://gpflow.kafotech.io}
+      ENVIRONMENT: ${ENVIRONMENT:-prod}
     depends_on:
-      postgres:
+      db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - gpflow-internal
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5177:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - gpflow-internal
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gpflow.rule=Host(`gpflow.kafotech.io`)"
+      - "traefik.http.routers.gpflow.entrypoints=websecure"
+      - "traefik.http.routers.gpflow.tls.certresolver=letsencrypt"
+      - "traefik.http.services.gpflow.loadbalancer.server.port=80"
+
+  db-backup:
+    image: prodrigestivill/postgres-backup-local:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${POSTGRES_DB:-gpflow}
+      POSTGRES_USER: ${POSTGRES_USER:-gpflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: "7"
+      BACKUP_KEEP_WEEKS: "4"
+      BACKUP_KEEP_MONTHS: "6"
     volumes:
-      - ./backend:/app          # live-reload in dev
-    command: >
-      uvicorn main:app
-      --host 0.0.0.0
-      --port 8000
+      - ./backups:/backups
+    depends_on:
+      - db
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - gpflow-internal
+
+networks:
+  gpflow-internal:
+    driver: bridge
+  web:
+    name: web
+    external: true
 
 volumes:
   postgres_data:

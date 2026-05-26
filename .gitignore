@@ -26,3 +26,9 @@ redis_data/
 # OS
 .DS_Store
 Thumbs.db
+
+# Root env and backups
+.env
+backups/
+*.save
+docker-compose.yml.save
