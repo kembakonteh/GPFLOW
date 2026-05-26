@@ -1,0 +1,47 @@
+## GPflow — Project Summary
+
+**What it is:** A shipping/freight logistics web app for managing trips between the US and Gambia (and potentially other routes). Operators manage trips; customers book packages.
+
+**Stack:**
+- Frontend: React + TypeScript (Vite), in /frontend/src
+- Backend: Python/FastAPI, in /backend/app
+- Docker Compose for local dev
+
+---
+
+### Core Domain Concepts
+
+- **Trips** — Either inbound (Gambia → US) or outbound (US → Gambia). Have a carrier, rate, departure/arrival dates, and a destination location.
+- **Bookings** — Packages attached to a trip. Can be walk-in or mail-in. Go through states: created → weighed → departed → arrived → confirmed/delivered.
+- **Rates** — Stored in kg in the DB, displayed in lb on the frontend. Conversion: rate_per_lb = rate_per_kg / 2.20462.
+- **Delivery types** — operator_delivers (operator mails the package via USPS/UPS) vs drop-off.
+
+---
+
+### Key Pages & Components
+
+- DashboardPage.tsx — Operator view, lists trips and bookings
+- BookingFormPage.tsx — Customer-facing booking form
+- PublicTripPage.tsx — Public trip info + booking entry point
+- BookingConfirmedPage.tsx — Post-booking confirmation
+- TrackingPage.tsx — Package tracking
+- modals/ — ScanModal, ArrivedModal, DepartedModal, WeighModal, etc.
+
+---
+
+### Recent Work (last ~20 commits)
+
+1. Rate display — Rate stored as per-kg in DB, shown as per-lb in UI. rate_per_kg added to PublicTrip type.
+2. Weigh button — Added to unweighed booking cards on dashboard; consolidated label shown after last package.
+3. Print label removed — Label printing removed from the flow.
+4. Back navigation — Added to BookingConfirmedPage, ArrivedModal notify step, DepartedModal confirm step.
+5. Mailing flow — Operator enters actual USPS/UPS cost after mailing; weight-based mailing rate per lb.
+6. Scan modal — Payment confirmation required before handover; Delivered → Mailed label fix for operator_delivers bookings.
+7. Inbound trip fixes — Drop-off location labels reflect trip direction; collection location/flag reflects trip destination.
+8. Walk-in inbound booking — Supports "mail to me" with delivery address.
+9. Trip setup modal — Mailing rate field hidden for outbound trips.
+
+---
+
+### Active Branch
+claude/gpflow-discussion-fuzmx on repo kembakonteh/gpflow
