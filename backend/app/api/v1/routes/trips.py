@@ -122,6 +122,7 @@ async def get_public(
         status=trip.status.value,
         pricing_model=trip.pricing_model.value,
         rate_display=rate_display,
+        rate_per_kg=trip.rate_per_kg,
         currency=trip.currency,
         capacity_kg=trip.capacity_kg,
         spots_remaining=spots,

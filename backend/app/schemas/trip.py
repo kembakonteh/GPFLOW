@@ -149,6 +149,7 @@ class PublicTripResponse(BaseModel):
     status:              str
     pricing_model:       str
     rate_display:        str      # e.g. "$3.62/lb" or "$8.00/kg"
+    rate_per_kg:         Decimal
     currency:            str
     capacity_kg:          Decimal | None
     spots_remaining:      int | None   # None when capacity not set
